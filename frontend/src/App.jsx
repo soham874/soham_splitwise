@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { checkLogin, fetchGroups, fetchCurrencies } from "./api";
+import { checkLogin, fetchGroups, fetchCurrencies, saveTripDetailsApi, getTripDetailsApi } from "./api";
 import Navbar from "./components/Navbar";
 import LoadingOverlay from "./components/LoadingOverlay";
 import TripSetupPage from "./components/TripSetupPage";
@@ -20,10 +20,7 @@ export default function App() {
   const [allGroups, setAllGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [availableCurrencies, setAvailableCurrencies] = useState([]);
-  const [tripDetails, setTripDetails] = useState(() => {
-    const saved = localStorage.getItem("trip_details");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [tripDetails, setTripDetails] = useState(null);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -62,8 +59,18 @@ export default function App() {
       try {
         const data = await checkLogin();
         if (data.logged_in) {
-          await Promise.all([loadCurrencies(), loadGroups()]);
-          setPage(tripDetails ? PAGES.TRIP_SUMMARY : PAGES.TRIP_SETUP);
+          const [, , tripData] = await Promise.all([
+            loadCurrencies(),
+            loadGroups(),
+            getTripDetailsApi(),
+          ]);
+          if (tripData.trip) {
+            setTripDetails(tripData.trip);
+            localStorage.setItem("default_group_id", tripData.trip.groupId);
+            setPage(PAGES.TRIP_SUMMARY);
+          } else {
+            setPage(PAGES.TRIP_SETUP);
+          }
         } else {
           window.location.href = "/login";
         }
@@ -74,9 +81,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveTripDetails = (details) => {
-    localStorage.setItem("trip_details", JSON.stringify(details));
-    setTripDetails(details);
+  const saveTripDetails = async (details) => {
+    const result = await saveTripDetailsApi(details);
+    const saved = result.trip || details;
+    setTripDetails(saved);
+    localStorage.setItem("default_group_id", saved.groupId);
     setPage(PAGES.TRIP_SUMMARY);
   };
 

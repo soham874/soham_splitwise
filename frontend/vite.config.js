@@ -16,6 +16,7 @@ export default defineConfig({
       "/delete_expense": "http://localhost:8080",
       "/get_currencies": "http://localhost:8080",
       "/save_trip_details": "http://localhost:8080",
+      "/get_trip_details": "http://localhost:8080",
       "/health": "http://localhost:8080",
     },
   },

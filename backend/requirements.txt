@@ -4,3 +4,4 @@ python-dotenv==1.0.1
 requests-oauthlib==2.0.0
 starlette==0.41.3
 itsdangerous==2.2.0
+mysql-connector-python==9.1.0

@@ -1,8 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.config import settings
+from backend.db import init_db
 from backend.controllers import (
     auth_controller,
     groups_controller,
@@ -11,7 +14,15 @@ from backend.controllers import (
     trip_controller,
 )
 
-app = FastAPI(title="Splitwise Manager API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: ensure DB & tables exist
+    init_db()
+    yield
+
+
+app = FastAPI(title="Splitwise Manager API", lifespan=lifespan)
 
 # Session middleware (cookie-based, mirrors Flask's session behaviour)
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)

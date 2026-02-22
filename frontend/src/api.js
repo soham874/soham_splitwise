@@ -49,3 +49,8 @@ export async function saveTripDetailsApi(details) {
   });
   return res.json();
 }
+
+export async function getTripDetailsApi() {
+  const res = await apiFetch("/get_trip_details");
+  return res.json();
+}
