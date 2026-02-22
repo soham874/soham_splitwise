@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Splitwise Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
+        .disabled-row { opacity: 0.6; pointer-events: none; background-color: #f9fafb; }
+        .table-container { -webkit-overflow-scrolling: touch; }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-900 font-sans">
+    <nav class="bg-emerald-600 p-4 text-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold cursor-pointer" onclick="showGroupsPage()">Splitwise Manager</h1>
+            <div id="nav-actions" class="flex items-center gap-3">
+                <button onclick="showGroupsPage()" class="hidden md:block text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 px-3 py-2 rounded transition">Switch Group</button>
+                <a href="/logout" class="bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded text-xs md:text-sm font-semibold transition">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Initial Loading State -->
+    <div id="loading-overlay" class="fixed inset-0 bg-white z-[60] flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-4 border-emerald-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-500 font-medium">Verifying Session...</p>
+    </div>
+
+    <div id="trip-setup-page" class="page container mx-auto py-6 px-4 max-w-xl">
+    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Setup Your Trip</h2>
+        <p class="text-gray-500 text-sm mb-6">Link your Splitwise group and set trip dates.</p>
+        <div>
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Trip Currencies</label>
+            <div id="setup-currency-list" class="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+                </div>
+            <p class="text-[10px] text-gray-400 mt-1">Select the currencies you will use on this trip.</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Trip Name</label>
+                <input type="text" id="trip_name" class="w-full border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Euro Summer 2026">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Start Date</label>
+                    <input type="date" id="trip_start" class="w-full border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">End Date</label>
+                    <input type="date" id="trip_end" class="w-full border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Select Splitwise Group</label>
+                <select id="trip_group_select" class="w-full border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500">
+                    </select>
+            </div>
+            <button onclick="saveTripDetails()" class="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl mt-4 hover:bg-emerald-700 transition">Start Trip</button>
+        </div>
+    </div>
+</div>
+
+<div id="trip-summary-page" class="page container mx-auto py-6 px-4 max-w-4xl">
+    <div class="bg-emerald-900 text-white p-8 rounded-3xl shadow-xl mb-8 relative overflow-hidden">
+        <div class="relative z-10">
+            <h2 id="summary-trip-name" class="text-3xl font-bold mb-1">Trip Name</h2>
+            <p id="summary-trip-dates" class="text-emerald-200 text-sm font-medium mb-6">Dates</p>
+            
+            <div class="flex flex-wrap gap-4">
+                <button onclick="enterGroupExpenses()" class="bg-white text-emerald-900 px-6 py-2.5 rounded-full font-bold text-sm hover:bg-emerald-50 transition">Manage Expenses</button>
+                <button onclick="showTripSetup()" class="bg-emerald-800 text-white px-6 py-2.5 rounded-full font-bold text-sm hover:bg-emerald-700 transition">Edit Trip Info</button>
+            </div>
+        </div>
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-800 rounded-full opacity-50"></div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 class="font-bold text-gray-400 text-[10px] uppercase tracking-widest mb-4">Linked Splitwise Group</h3>
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold" id="summary-group-initial">G</div>
+                <div>
+                    <p id="summary-group-name" class="font-bold text-gray-800">Group Name</p>
+                    <p id="summary-group-members" class="text-xs text-gray-500">0 Members</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- PAGE 1: GROUP SELECTION -->
+    <div id="groups-page" class="page container mx-auto py-6 px-4 max-w-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-800">Your Groups</h2>
+            <button onclick="loadGroups()" class="text-emerald-600 text-sm font-semibold hover:underline">Refresh</button>
+        </div>
+        <div id="group-list" class="grid grid-cols-1 gap-3">
+            <!-- Groups injected here -->
+        </div>
+    </div>
+
+    <!-- PAGE 2: GROUP DASHBOARD -->
+    <div id="dashboard-page" class="page container mx-auto py-4 md:py-8 px-4 max-w-7xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <button onclick="showGroupsPage()" class="flex items-center text-emerald-600 font-semibold hover:translate-x-[-4px] transition-transform">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                Change Group
+            </button>
+            <h2 class="text-xl md:text-2xl font-bold text-gray-800" id="current-group-name">Group Name</h2>
+        </div>
+
+        <div class="grid grid-cols-1 gap-8">
+            <!-- Top Section: Expense Form -->
+            <section id="expense-form-container" class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200">
+                <input type="hidden" id="edit_expense_id" value="">
+                
+                <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+                    <div>
+                        <p class="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-wider" id="form-title">Create Expense</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <div class="flex items-center bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+                            <input type="checkbox" id="split_equally" class="w-4 h-4 rounded text-emerald-600" onchange="toggleSplitMode()" checked>
+                            <label for="split_equally" class="ml-2 text-xs md:text-sm font-semibold text-emerald-800 cursor-pointer whitespace-nowrap">Split Equally</label>
+                        </div>
+                        <select id="currency" class="border rounded-full px-3 py-1.5 text-xs bg-white font-medium outline-none border-gray-200">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Description</label>
+                        <input type="text" id="description" class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="What was it for?">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Total Cost</label>
+                        <input type="number" id="total_cost" step="0.01" class="w-full border border-gray-200 rounded-lg p-2.5 font-mono text-base focus:ring-2 focus:ring-emerald-500 outline-none" value="0.00" oninput="handleCostChange()">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Who Paid?</label>
+                        <select id="who_paid_select" class="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none" onchange="handlePayerChange()">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Notes / Details</label>
+                        <textarea id="notes" class="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none" rows="1" style="min-height: 42px;" placeholder="Add notes..."></textarea>
+                    </div>
+                </div>
+
+                <div class="table-container overflow-x-auto -mx-4 md:mx-0 border-t border-gray-100">
+                    <table class="w-full text-left text-xs md:text-sm min-w-[500px]">
+                        <thead>
+                            <tr class="text-gray-400 uppercase text-[10px] tracking-wider">
+                                <th class="p-4 font-bold">Member</th>
+                                <th class="p-4 font-bold w-32">Paid</th>
+                                <th class="p-4 font-bold w-24">Owed (%)</th>
+                                <th class="p-4 font-bold w-32 text-right">Owed (Amount)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="split-table-body"></tbody>
+                    </table>
+                </div>
+
+                <div class="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 border-t pt-6">
+                    <div class="flex items-center w-full md:w-auto justify-between md:justify-start">
+                        <div class="text-xs md:text-sm space-x-4">
+                            <span class="text-gray-400 font-medium">Paid: <span id="sum-paid" class="text-gray-900 font-bold">0.00</span></span>
+                            <span class="text-gray-400 font-medium">Owed: <span id="sum-owed" class="text-gray-900 font-bold">0.00</span></span>
+                        </div>
+                        <button id="cancel-edit-btn" onclick="resetForm()" class="hidden ml-4 text-xs text-red-600 font-bold hover:underline uppercase">Cancel</button>
+                    </div>
+                    <button id="submit-btn" onclick="submitExpense()" class="w-full md:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:bg-gray-300">
+                        Create Expense
+                    </button>
+                </div>
+            </section>
+
+            <!-- Bottom Section: Summary & History -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Group Summary -->
+                <div class="lg:col-span-1 space-y-4">
+                    <h3 class="text-base md:text-lg font-bold text-gray-800 px-1">Summary</h3>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Current Balances</p>
+                            <div id="group-balances" class="space-y-2 mb-6"></div>
+                        </div>
+                        <div class="border-t border-gray-50 pt-4">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mb-3 tracking-wider">Suggested Settlements</p>
+                            <div id="who-owes-whom" class="space-y-3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expense History -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex justify-between items-center px-1">
+                        <h3 class="text-base md:text-lg font-bold text-gray-800">Expense History</h3>
+                        <button onclick="loadExpenseHistory(activeGroup.id)" class="text-[10px] md:text-xs text-emerald-600 hover:underline font-bold uppercase tracking-wider">Refresh</button>
+                    </div>
+                    
+                    <div class="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="table-container overflow-x-auto">
+                            <table class="w-full text-left text-xs md:text-sm min-w-[800px]">
+                                <thead class="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider">
+                                    <tr>
+                                        <th class="p-4 border-b">Date & Description</th>
+                                        <th class="p-4 border-b">Split Details</th>
+                                        <th class="p-4 border-b text-right">Cost</th>
+                                        <th class="p-4 border-b text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expense-history-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="expense-history-mobile" class="md:hidden space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allGroups = [];
+        let activeGroup = null;
+        let currentExpenses = [];
+        let availableCurrencies = [];
+
+        let tripDetails = JSON.parse(localStorage.getItem('trip_details')) || null;
+
+        async function init() {
+    try {
+        const res = await fetch('/check_login');
+        const data = await res.json();
+        if (data.logged_in) {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            await Promise.all([loadCurrencies(), loadGroups(true)]);
+            
+            if (tripDetails) {
+                renderTripSummary();
+            } else {
+                showTripSetup();
+            }
+        } else {
+            window.location.href = "/login";
+        }
+    } catch (e) {
+        window.location.href = "/login";
+    }
+}
+
+// Update showTripSetup to trigger the checkbox render
+function showTripSetup() {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('trip-setup-page').classList.add('active');
+    
+    const select = document.getElementById('trip_group_select');
+    select.innerHTML = allGroups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+    
+    renderSetupCurrencies(); // New call
+    
+    if (tripDetails) {
+        document.getElementById('trip_name').value = tripDetails.name;
+        document.getElementById('trip_start').value = tripDetails.start;
+        document.getElementById('trip_end').value = tripDetails.end;
+        select.value = tripDetails.groupId;
+    }
+}
+
+// 2. Save the selected currencies to localStorage
+async function saveTripDetails() {
+    const selectedCurrs = Array.from(document.querySelectorAll('input[name="trip_currency"]:checked'))
+                               .map(cb => cb.value);
+
+    const details = {
+        name: document.getElementById('trip_name').value,
+        start: document.getElementById('trip_start').value,
+        end: document.getElementById('trip_end').value,
+        groupId: document.getElementById('trip_group_select').value,
+        currencies: selectedCurrs // Save choice
+    };
+
+    localStorage.setItem('trip_details', JSON.stringify(details));
+    tripDetails = details;
+    
+    // Filter the expense form dropdown immediately
+    filterExpenseCurrencies();
+    renderTripSummary();
+}
+
+// 3. Filter the main expense dropdown based on trip settings
+function filterExpenseCurrencies() {
+    const select = document.getElementById('currency');
+    if (!tripDetails || !tripDetails.currencies || tripDetails.currencies.length === 0) {
+        // Fallback to all if none selected
+        renderMainCurrencyDropdown(availableCurrencies);
+        return;
+    }
+    
+    const filtered = availableCurrencies.filter(c => 
+        tripDetails.currencies.includes(c.currency_code) ||
+        c.currency_code === 'INR' ||
+        c.currency_code === 'USD'
+    );
+    renderMainCurrencyDropdown(filtered);
+}
+
+function renderMainCurrencyDropdown(list) {
+    const select = document.getElementById('currency');
+    select.innerHTML = list.map(c => 
+        `<option value="${c.currency_code}">${c.currency_code}</option>`
+    ).join('');
+}
+
+function renderTripSummary() {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('trip-summary-page').classList.add('active');
+
+    const group = allGroups.find(g => g.id.toString() === tripDetails.groupId.toString());
+    
+    document.getElementById('summary-trip-name').innerText = tripDetails.name;
+    document.getElementById('summary-trip-dates').innerText = `${tripDetails.start} to ${tripDetails.end}`;
+    if (group) {
+        document.getElementById('summary-group-name').innerText = group.name;
+        document.getElementById('summary-group-members').innerText = `${group.members.length} Members`;
+        document.getElementById('summary-group-initial').innerText = group.name[0];
+    }
+}
+
+function enterGroupExpenses() {
+    if (tripDetails && tripDetails.groupId) {
+        showDashboard(parseInt(tripDetails.groupId));
+    }
+}
+
+        async function loadCurrencies() {
+            try {
+                const res = await fetch('/get_currencies');
+                const data = await res.json();
+                availableCurrencies = data.currencies || [];
+                const select = document.getElementById('currency');
+                
+                // Sort commonly used currencies to top (optional)
+                const favorites = ['INR', 'USD', 'EUR', 'GBP'];
+                const sorted = availableCurrencies.sort((a, b) => {
+                    const aFav = favorites.indexOf(a.currency_code);
+                    const bFav = favorites.indexOf(b.currency_code);
+                    if (aFav !== -1 && bFav !== -1) return aFav - bFav;
+                    if (aFav !== -1) return -1;
+                    if (bFav !== -1) return 1;
+                    return a.currency_code.localeCompare(b.currency_code);
+                });
+
+                select.innerHTML = sorted.map(c => 
+                    `<option value="${c.currency_code}">${c.currency_code} (${c.unit || ''})</option>`
+                ).join('');
+                
+                // Set default to INR if available
+                if (sorted.some(c => c.currency_code === 'INR')) {
+                    select.value = 'INR';
+                }
+            } catch (e) {
+                console.error("Failed to load currencies", e);
+                // Fallback
+                document.getElementById('currency').innerHTML = '<option value="INR">INR (₹)</option><option value="USD">USD ($)</option>';
+            }
+        }
+
+        function showGroupsPage() {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('groups-page').classList.add('active');
+            loadGroups();
+        }
+
+        function showDashboard(groupId) {
+            activeGroup = allGroups.find(g => g.id === groupId);
+            if (!activeGroup) {
+                showGroupsPage();
+                return;
+            }
+            localStorage.setItem('default_group_id', groupId);
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('dashboard-page').classList.add('active');
+            document.getElementById('current-group-name').innerText = activeGroup.name;
+            resetForm();
+            populatePayerSelect();
+            renderSplitTable();
+            renderBalances();
+            loadExpenseHistory(groupId);
+        }
+
+        async function loadGroups(silent = false) {
+            const container = document.getElementById('group-list');
+            if (!silent) container.innerHTML = '<div class="p-10 text-center italic text-gray-400">Loading groups...</div>';
+            
+            try {
+                const res = await fetch(`/get_groups?t=${Date.now()}`);
+                if (res.status === 401) return window.location.href = "/login";
+                const data = await res.json();
+                allGroups = data.groups || [];
+                
+                if (!silent) {
+                    container.innerHTML = allGroups.map(g => `
+                        <div onclick="showDashboard(${g.id})" class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center cursor-pointer hover:border-emerald-500 hover:shadow-md transition">
+                            <div>
+                                <h3 class="font-bold text-gray-800">${g.name}</h3>
+                                <p class="text-xs text-gray-500 font-medium">${g.members.length} members</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                if (!silent) container.innerHTML = '<p class="text-red-500 text-center">Error connecting to server.</p>';
+            }
+        }
+
+        function renderBalances() {
+            if (!activeGroup) return;
+            const htmlBalances = activeGroup.members.map(member => {
+                const balances = member.balance || [];
+                const net = balances.reduce((acc, b) => acc + parseFloat(b.amount), 0);
+                const colorClass = net > 0 ? 'text-emerald-600' : (net < 0 ? 'text-red-500' : 'text-gray-400');
+                return `
+                    <div class="flex justify-between items-center py-1 border-b border-gray-50 last:border-0">
+                        <span class="text-xs font-medium text-gray-700">${member.first_name}</span>
+                        <span class="text-xs font-mono font-bold ${colorClass}">${net > 0 ? '+' : ''}${net.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const debts = activeGroup.simplified_debts || [];
+            let htmlDebts = debts.length === 0 ? '<p class="text-[11px] text-gray-400 italic">No pending settlements</p>' : 
+                debts.map(debt => {
+                    const from = activeGroup.members.find(m => m.id === debt.from)?.first_name || '...';
+                    const to = activeGroup.members.find(m => m.id === debt.to)?.first_name || '...';
+                    return `
+                        <div class="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                            <span class="text-[11px] font-bold text-gray-700 truncate flex-1">${from}</span>
+                            <div class="flex flex-col items-center">
+                                <span class="text-[9px] font-mono font-bold text-emerald-600">${parseFloat(debt.amount).toFixed(2)}</span>
+                                <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7-7 7M3 12h18"/></svg>
+                            </div>
+                            <span class="text-[11px] font-bold text-gray-700 truncate flex-1 text-right">${to}</span>
+                        </div>
+                    `;
+                }).join('');
+
+            document.getElementById('group-balances').innerHTML = htmlBalances;
+            document.getElementById('who-owes-whom').innerHTML = htmlDebts;
+        }
+
+        async function loadExpenseHistory(groupId) {
+            const tbody = document.getElementById('expense-history-table');
+            const mobile = document.getElementById('expense-history-mobile');
+            try {
+                const res = await fetch(`/get_expenses/${groupId}?t=${Date.now()}`);
+                const data = await res.json();
+                currentExpenses = data.expenses || [];
+                
+                tbody.innerHTML = currentExpenses.map(e => {
+                    const payers = e.users.filter(u => parseFloat(u.paid_share) > 0);
+                    const owers = e.users.filter(u => parseFloat(u.owed_share) > 0);
+                    return `
+                        <tr class="hover:bg-gray-50 border-b border-gray-50 text-[13px] align-top">
+                            <td class="p-4">
+                                <div class="text-[10px] text-gray-400 mb-1">${new Date(e.created_at).toLocaleDateString()}</div>
+                                <div class="font-bold text-gray-800 mb-1">${e.description}</div>
+                                ${e.details ? `<div class="text-[11px] text-emerald-600 italic bg-emerald-50 px-2 py-0.5 rounded inline-block">Note: ${e.details}</div>` : ''}
+                            </td>
+                            <td class="p-4">
+                                <div class="mb-2"><span class="text-[10px] font-bold text-gray-400 uppercase">Paid:</span><span class="text-gray-600 ml-1">${payers.map(p => `${p.user.first_name} (${p.paid_share})`).join(', ')}</span></div>
+                                <div><span class="text-[10px] font-bold text-gray-400 uppercase">Owes:</span><span class="text-gray-600 ml-1">${owers.map(o => `${o.user.first_name} (${o.owed_share})`).join(', ')}</span></div>
+                            </td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-600">${e.currency_code} ${e.cost}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex flex-col gap-1">
+                                    <button onclick="editExpense(${e.id})" class="text-emerald-600 px-2 py-1 hover:bg-emerald-50 rounded text-xs font-bold">Edit</button>
+                                    <button onclick="deleteExpense(${e.id})" class="text-red-500 px-2 py-1 hover:bg-red-50 rounded text-xs font-bold">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                mobile.innerHTML = currentExpenses.map(e => `
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div><h4 class="font-bold text-gray-900 text-sm">${e.description}</h4><p class="text-[10px] text-gray-400 uppercase tracking-tighter">${new Date(e.created_at).toLocaleDateString()}</p></div>
+                            <p class="font-mono font-bold text-emerald-600 text-sm">${e.currency_code} ${e.cost}</p>
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button onclick="editExpense(${e.id})" class="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold">Edit</button>
+                            <button onclick="deleteExpense(${e.id})" class="flex-1 py-1.5 bg-red-50 text-red-600 rounded text-[10px] font-bold">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {}
+        }
+
+        function renderSplitTable() {
+            const tbody = document.getElementById('split-table-body');
+            tbody.innerHTML = activeGroup.members.map(m => `
+                <tr class="border-b border-gray-50 member-row" data-id="${m.id}">
+                    <td class="p-4 font-bold text-gray-700 text-xs">${m.first_name}</td>
+                    <td class="p-4 paid-col-cell">
+                        <input type="number" step="0.01" value="0.00" class="paid-input w-full p-2 border rounded text-xs font-mono" oninput="updateCalculations('paid')">
+                    </td>
+                    <td class="p-4 owed-col-cell">
+                        <input type="number" step="0.1" value="0" class="percent-input w-full p-2 border rounded text-xs font-mono" oninput="updateCalculations('percent')">
+                    </td>
+                    <td class="p-4 text-right owed-col-cell">
+                        <input type="number" step="0.01" value="0.00" class="owed-amt-input w-full p-2 border rounded text-xs text-right font-mono bg-gray-50" oninput="updateCalculations('amt')">
+                    </td>
+                </tr>
+            `).join('');
+            toggleSplitMode(); 
+        }
+
+        function updateCalculations(source) {
+            const total = parseFloat(document.getElementById('total_cost').value || 0);
+            const isEqually = document.getElementById('split_equally').checked;
+            const members = document.querySelectorAll('.member-row');
+            let sumPaid = 0, sumOwed = 0;
+
+            members.forEach((row, index) => {
+                const paidInput = row.querySelector('.paid-input');
+                const pctInput = row.querySelector('.percent-input');
+                const amtInput = row.querySelector('.owed-amt-input');
+
+                if (isEqually) {
+                    const share = (total / members.length).toFixed(2);
+                    amtInput.value = (index === members.length - 1) ? (total - (share * (members.length - 1))).toFixed(2) : share;
+                    pctInput.value = (100 / members.length).toFixed(1);
+                } else if (source === 'percent' && total > 0) {
+                    amtInput.value = (total * (parseFloat(pctInput.value || 0) / 100)).toFixed(2);
+                } else if (source === 'amt' && total > 0) {
+                    pctInput.value = ((parseFloat(amtInput.value || 0) / total) * 100).toFixed(1);
+                }
+                sumPaid += parseFloat(paidInput.value || 0);
+                sumOwed += parseFloat(amtInput.value || 0);
+            });
+
+            document.getElementById('sum-paid').innerText = sumPaid.toFixed(2);
+            document.getElementById('sum-owed').innerText = sumOwed.toFixed(2);
+            document.getElementById('submit-btn').disabled = (Math.abs(sumPaid - total) > 0.05 || total <= 0);
+        }
+
+        async function submitExpense() {
+            const editId = document.getElementById('edit_expense_id').value;
+            const payload = {
+                cost: document.getElementById('total_cost').value,
+                description: document.getElementById('description').value,
+                details: document.getElementById('notes').value,
+                currency_code: document.getElementById('currency').value,
+                group_id: activeGroup.id
+            };
+            if (editId) payload.id = editId;
+            document.querySelectorAll('.member-row').forEach((row, i) => {
+                payload[`users__${i}__user_id`] = row.dataset.id;
+                payload[`users__${i}__paid_share`] = row.querySelector('.paid-input').value;
+                payload[`users__${i}__owed_share`] = row.querySelector('.owed-amt-input').value;
+            });
+
+            try {
+                await fetch('/create_expense', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                await loadGroups(true);
+                showDashboard(activeGroup.id);
+            } catch (e) {}
+        }
+
+        async function deleteExpense(id) {
+            if (!confirm("Delete expense?")) return;
+            await fetch(`/delete_expense/${id}`, { method: 'POST' });
+            await loadGroups(true);
+            showDashboard(activeGroup.id);
+        }
+
+        function editExpense(id) {
+            const exp = currentExpenses.find(e => e.id === id);
+            if (!exp) return;
+            document.getElementById('form-title').innerText = "Update Expense";
+            document.getElementById('submit-btn').innerText = "Update Expense";
+            document.getElementById('edit_expense_id').value = id;
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+            document.getElementById('description').value = exp.description;
+            document.getElementById('total_cost').value = exp.cost;
+            document.getElementById('notes').value = exp.details || "";
+            document.getElementById('currency').value = exp.currency_code;
+            document.getElementById('split_equally').checked = false;
+            
+            document.querySelectorAll('.member-row').forEach(row => {
+                const memberData = exp.users.find(u => u.user_id.toString() === row.dataset.id);
+                if (memberData) {
+                    row.querySelector('.paid-input').value = memberData.paid_share;
+                    row.querySelector('.owed-amt-input').value = memberData.owed_share;
+                }
+            });
+            toggleSplitMode();
+            updateCalculations('amt');
+            document.getElementById('expense-form-container').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function toggleSplitMode() {
+            const isEqually = document.getElementById('split_equally').checked;
+            document.querySelectorAll('.member-row').forEach(row => {
+                row.querySelector('.paid-col-cell').classList.toggle('disabled-row', isEqually);
+                row.querySelectorAll('.owed-col-cell').forEach(c => c.classList.toggle('disabled-row', isEqually));
+            });
+            handleCostChange();
+        }
+
+        function renderSetupCurrencies() {
+    const container = document.getElementById('setup-currency-list');
+    container.innerHTML = availableCurrencies.map(c => `
+        <label class="flex items-center space-x-2 bg-gray-50 px-3 py-1 rounded-full border border-gray-100 cursor-pointer hover:bg-emerald-50">
+            <input type="checkbox" name="trip_currency" value="${c.currency_code}" 
+                ${tripDetails?.currencies?.includes(c.currency_code) ? 'checked' : ''} 
+                class="rounded text-emerald-600">
+            <span class="text-xs font-medium">${c.currency_code}</span>
+        </label>
+    `).join('');
+}
+
+        function handlePayerChange() {
+            const pId = document.getElementById('who_paid_select').value;
+            const total = parseFloat(document.getElementById('total_cost').value || 0);
+            if (pId !== "multiple") {
+                document.querySelectorAll('.member-row').forEach(r => {
+                    r.querySelector('.paid-input').value = (r.dataset.id === pId) ? total.toFixed(2) : "0.00";
+                });
+            }
+            updateCalculations('equal');
+        }
+
+        function handleCostChange() { handlePayerChange(); }
+
+        function populatePayerSelect() {
+            const select = document.getElementById('who_paid_select');
+            select.innerHTML = activeGroup.members.map(m => 
+                `<option value="${m.id}">${m.first_name}</option>`
+            ).join('') + '<option value="multiple">Multiple...</option>';
+        }
+
+        function resetForm() {
+            document.getElementById('form-title').innerText = "Create Expense";
+            document.getElementById('submit-btn').innerText = "Create Expense";
+            document.getElementById('edit_expense_id').value = "";
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+            document.getElementById('description').value = "";
+            document.getElementById('total_cost').value = "0.00";
+            document.getElementById('notes').value = "";
+            document.getElementById('split_equally').checked = true;
+            if (activeGroup) { populatePayerSelect(); renderSplitTable(); }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
