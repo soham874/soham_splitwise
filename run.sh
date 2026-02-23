@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+clear
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"

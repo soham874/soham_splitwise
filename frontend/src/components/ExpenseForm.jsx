@@ -1,9 +1,23 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
+const EXPENSE_CATEGORIES = [
+  "Important Documents",
+  "Preparation",
+  "Currency Conversion",
+  "Local Transit",
+  "Food",
+  "Leisure",
+  "Memento",
+  "Sight Seeing",
+  "Misc",
+];
+
 export default function ExpenseForm({
   activeGroup,
   currencies,
   currentExpenses,
+  currentUser,
+  tripLocations = [],
   onSubmit,
 }) {
   const [editId, setEditId] = useState("");
@@ -12,9 +26,22 @@ export default function ExpenseForm({
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState(currencies[0]?.currency_code || "INR");
   const [splitEqually, setSplitEqually] = useState(true);
-  const [payerId, setPayerId] = useState(
-    activeGroup.members[0]?.id?.toString() || ""
-  );
+  const [location, setLocation] = useState(tripLocations[0] || "");
+  const [category, setCategory] = useState(EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]);
+  const skipRecalcRef = useRef(false);
+
+  // Resolve the default payer to the logged-in user if they are a group member
+  const resolveDefaultPayer = () => {
+    if (currentUser?.name) {
+      const match = activeGroup.members.find(
+        (m) => m.first_name === currentUser.name.split(" ")[0]
+      );
+      if (match) return match.id.toString();
+    }
+    return activeGroup.members[0]?.id?.toString() || "";
+  };
+
+  const [payerId, setPayerId] = useState(resolveDefaultPayer);
   const [memberSplits, setMemberSplits] = useState([]);
   const formRef = useRef(null);
 
@@ -29,7 +56,8 @@ export default function ExpenseForm({
         owedAmt: "0.00",
       }))
     );
-    setPayerId(activeGroup.members[0]?.id?.toString() || "");
+    setPayerId(resolveDefaultPayer());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup]);
 
   const recalculate = useCallback(
@@ -61,6 +89,10 @@ export default function ExpenseForm({
   // Recalculate on cost / payer / split-mode change
   useEffect(() => {
     if (memberSplits.length === 0) return;
+    if (skipRecalcRef.current) {
+      skipRecalcRef.current = false;
+      return;
+    }
     setMemberSplits((prev) => recalculate(totalCost, prev, splitEqually, payerId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalCost, splitEqually, payerId]);
@@ -103,6 +135,8 @@ export default function ExpenseForm({
       details: notes,
       currency_code: currency,
       group_id: activeGroup.id,
+      location,
+      category,
     };
     if (editId) payload.id = editId;
     memberSplits.forEach((s, i) => {
@@ -121,7 +155,9 @@ export default function ExpenseForm({
     setNotes("");
     setSplitEqually(true);
     setCurrency(currencies[0]?.currency_code || "INR");
-    setPayerId(activeGroup.members[0]?.id?.toString() || "");
+    setLocation(tripLocations[0] || "");
+    setCategory(EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]);
+    setPayerId(resolveDefaultPayer());
     setMemberSplits(
       activeGroup.members.map((m) => ({
         id: m.id.toString(),
@@ -136,26 +172,39 @@ export default function ExpenseForm({
   const editExpense = (id) => {
     const exp = currentExpenses.find((e) => e.id === id);
     if (!exp) return;
+
+    // Determine the actual payer(s) from the record
+    const payers = exp.users.filter((u) => parseFloat(u.paid_share) > 0);
+    const resolvedPayer =
+      payers.length === 1 ? payers[0].user_id.toString() : "multiple";
+
+    // Build splits from the record as-is
+    const loadedSplits = activeGroup.members.map((m) => {
+      const userData = exp.users.find(
+        (u) => u.user_id.toString() === m.id.toString()
+      );
+      const total = parseFloat(exp.cost || 0);
+      const owed = parseFloat(userData?.owed_share || 0);
+      return {
+        id: m.id.toString(),
+        name: m.first_name,
+        paid: userData?.paid_share || "0.00",
+        percent: total > 0 ? ((owed / total) * 100).toFixed(1) : "0",
+        owedAmt: userData?.owed_share || "0.00",
+      };
+    });
+
+    // Skip the next recalculate effect so it doesn't overwrite paid/owed values
+    skipRecalcRef.current = true;
+
     setEditId(id.toString());
     setDescription(exp.description);
     setTotalCost(exp.cost);
     setNotes(exp.details || "");
     setCurrency(exp.currency_code);
+    setPayerId(resolvedPayer);
     setSplitEqually(false);
-    setMemberSplits(
-      activeGroup.members.map((m) => {
-        const userData = exp.users.find(
-          (u) => u.user_id.toString() === m.id.toString()
-        );
-        return {
-          id: m.id.toString(),
-          name: m.first_name,
-          paid: userData?.paid_share || "0.00",
-          percent: "0",
-          owedAmt: userData?.owed_share || "0.00",
-        };
-      })
-    );
+    setMemberSplits(loadedSplits);
     formRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -209,7 +258,7 @@ export default function ExpenseForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
             Description
@@ -251,6 +300,44 @@ export default function ExpenseForm({
             <option value="multiple">Multiple...</option>
           </select>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+            Location
+          </label>
+          <select
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+          >
+            {tripLocations.length === 0 && (
+              <option value="">No locations set</option>
+            )}
+            {tripLocations.map((loc) => (
+              <option key={loc} value={loc}>
+                {loc}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
+            Expense Category
+          </label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+          >
+            {EXPENSE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
             Notes / Details
@@ -258,9 +345,9 @@ export default function ExpenseForm({
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-            rows="1"
-            style={{ minHeight: "42px" }}
+            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-y"
+            rows="3"
+            style={{ minHeight: "80px" }}
             placeholder="Add notes..."
           />
         </div>

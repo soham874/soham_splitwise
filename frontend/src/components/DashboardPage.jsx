@@ -8,6 +8,7 @@ export default function DashboardPage({
   activeGroup,
   availableCurrencies,
   tripDetails,
+  currentUser,
   onBack,
   onRefresh,
 }) {
@@ -86,6 +87,8 @@ export default function DashboardPage({
           activeGroup={activeGroup}
           currencies={filteredCurrencies}
           currentExpenses={currentExpenses}
+          currentUser={currentUser}
+          tripLocations={tripDetails?.locations || []}
           onSubmit={handleSubmit}
         />
 

@@ -22,7 +22,12 @@ def check_login(request: Request):
         and SESSION_ACCESS_TOKEN_SECRET in request.session
         and SESSION_USER_ID in request.session
     )
-    return {"logged_in": is_logged_in}
+    result = {"logged_in": is_logged_in}
+    if is_logged_in:
+        user = user_service.get_user_by_id(request.session[SESSION_USER_ID])
+        if user:
+            result["user"] = {"id": user["id"], "name": user["name"], "email": user["email"]}
+    return result
 
 
 @router.get("/login")

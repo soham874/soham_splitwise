@@ -118,40 +118,81 @@ export default function ExpenseHistory({
 
       {/* Mobile cards */}
       <div className="md:hidden space-y-3">
-        {currentExpenses.map((e) => (
-          <div
-            key={e.id}
-            className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-gray-900 text-sm">
-                  {e.description}
-                </h4>
-                <p className="text-[10px] text-gray-400 uppercase tracking-tighter">
-                  {new Date(e.created_at).toLocaleDateString()}
+        {currentExpenses.map((e) => {
+          const payers = e.users.filter(
+            (u) => parseFloat(u.paid_share) > 0
+          );
+          const owers = e.users.filter(
+            (u) => parseFloat(u.owed_share) > 0
+          );
+          return (
+            <div
+              key={e.id}
+              className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-bold text-gray-900 text-sm">
+                    {e.description}
+                  </h4>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-tighter">
+                    {new Date(e.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <p className="font-mono font-bold text-emerald-600 text-sm">
+                  {e.currency_code} {e.cost}
                 </p>
               </div>
-              <p className="font-mono font-bold text-emerald-600 text-sm">
-                {e.currency_code} {e.cost}
-              </p>
+              {e.details && (
+                <div className="text-[11px] text-emerald-600 italic bg-emerald-50 px-2 py-0.5 rounded inline-block">
+                  Note: {e.details}
+                </div>
+              )}
+              <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">
+                    Paid:
+                  </span>
+                  <div className="mt-0.5 space-y-0.5">
+                    {payers.map((p) => (
+                      <div key={p.user_id} className="text-xs text-gray-700 flex justify-between">
+                        <span>{p.user.first_name}</span>
+                        <span className="font-mono font-semibold">{e.currency_code} {p.paid_share}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">
+                    Owes:
+                  </span>
+                  <div className="mt-0.5 space-y-0.5">
+                    {owers.map((o) => (
+                      <div key={o.user_id} className="text-xs text-gray-700 flex justify-between">
+                        <span>{o.user.first_name}</span>
+                        <span className="font-mono font-semibold">{e.currency_code} {o.owed_share}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => handleEdit(e.id)}
+                  className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDelete(e.id)}
+                  className="flex-1 py-1.5 bg-red-50 text-red-600 rounded text-[10px] font-bold"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleEdit(e.id)}
-                className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => onDelete(e.id)}
-                className="flex-1 py-1.5 bg-red-50 text-red-600 rounded text-[10px] font-bold"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

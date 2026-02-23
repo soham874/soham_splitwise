@@ -23,6 +23,7 @@ export default function App() {
   const [activeGroup, setActiveGroup] = useState(null);
   const [availableCurrencies, setAvailableCurrencies] = useState([]);
   const [tripDetails, setTripDetails] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -61,6 +62,7 @@ export default function App() {
       try {
         const data = await checkLogin();
         if (data.logged_in) {
+          if (data.user) setCurrentUser(data.user);
           const [, , tripData] = await Promise.all([
             loadCurrencies(),
             loadGroups(),
@@ -151,6 +153,7 @@ export default function App() {
           activeGroup={activeGroup}
           availableCurrencies={availableCurrencies}
           tripDetails={tripDetails}
+          currentUser={currentUser}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
           onRefresh={refreshAndShowDashboard}
         />
