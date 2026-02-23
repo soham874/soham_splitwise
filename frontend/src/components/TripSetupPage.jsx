@@ -5,6 +5,7 @@ export default function TripSetupPage({
   availableCurrencies,
   tripDetails,
   onSave,
+  onCancel,
 }) {
   const [name, setName] = useState(tripDetails?.name || "");
   const [start, setStart] = useState(tripDetails?.start || "");
@@ -118,8 +119,16 @@ export default function TripSetupPage({
             onClick={handleSave}
             className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl mt-4 hover:bg-emerald-700 transition"
           >
-            Start Trip
+            {tripDetails ? "Save Changes" : "Start Trip"}
           </button>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="w-full text-gray-500 font-semibold py-2 mt-2 hover:text-gray-700 transition text-sm"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     </div>

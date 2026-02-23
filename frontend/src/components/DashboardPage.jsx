@@ -74,7 +74,7 @@ export default function DashboardPage({
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          Change Group
+          Back to Trip
         </button>
         <h2 className="text-xl md:text-2xl font-bold text-gray-800">
           {activeGroup.name}

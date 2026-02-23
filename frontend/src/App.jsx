@@ -3,16 +3,18 @@ import { checkLogin, fetchGroups, fetchCurrencies, saveTripDetailsApi, getTripDe
 import Navbar from "./components/Navbar";
 import LoadingOverlay from "./components/LoadingOverlay";
 import TripSetupPage from "./components/TripSetupPage";
-import TripSummaryPage from "./components/TripSummaryPage";
-import GroupsPage from "./components/GroupsPage";
+import MyTripsPage from "./components/MyTripsPage";
+import TripDetailPage from "./components/TripDetailPage";
 import DashboardPage from "./components/DashboardPage";
+import AnalyticsPage from "./components/AnalyticsPage";
 
 const PAGES = {
   LOADING: "loading",
+  MY_TRIPS: "my_trips",
   TRIP_SETUP: "trip_setup",
-  TRIP_SUMMARY: "trip_summary",
-  GROUPS: "groups",
+  TRIP_DETAIL: "trip_detail",
   DASHBOARD: "dashboard",
+  ANALYTICS: "analytics",
 };
 
 export default function App() {
@@ -66,11 +68,8 @@ export default function App() {
           ]);
           if (tripData.trip) {
             setTripDetails(tripData.trip);
-            localStorage.setItem("default_group_id", tripData.trip.groupId);
-            setPage(PAGES.TRIP_SUMMARY);
-          } else {
-            setPage(PAGES.TRIP_SETUP);
           }
+          setPage(PAGES.MY_TRIPS);
         } else {
           window.location.href = "/login";
         }
@@ -85,16 +84,21 @@ export default function App() {
     const result = await saveTripDetailsApi(details);
     const saved = result.trip || details;
     setTripDetails(saved);
-    localStorage.setItem("default_group_id", saved.groupId);
-    setPage(PAGES.TRIP_SUMMARY);
+    setPage(PAGES.MY_TRIPS);
   };
 
-  const showDashboard = (groupId) => {
-    const group = allGroups.find((g) => g.id === groupId);
-    if (!group) return;
-    localStorage.setItem("default_group_id", groupId);
-    setActiveGroup(group);
-    setPage(PAGES.DASHBOARD);
+  const openTripDetail = () => {
+    setPage(PAGES.TRIP_DETAIL);
+  };
+
+  const openDashboard = () => {
+    if (!tripDetails?.groupId) return;
+    const gid = parseInt(tripDetails.groupId);
+    const group = allGroups.find((g) => g.id === gid);
+    if (group) {
+      setActiveGroup(group);
+      setPage(PAGES.DASHBOARD);
+    }
   };
 
   const refreshAndShowDashboard = async (groupId) => {
@@ -110,12 +114,16 @@ export default function App() {
 
   return (
     <div>
-      <Navbar
-        onSwitchGroup={() => {
-          loadGroups();
-          setPage(PAGES.GROUPS);
-        }}
-      />
+      <Navbar onHome={() => setPage(PAGES.MY_TRIPS)} />
+
+      {page === PAGES.MY_TRIPS && (
+        <MyTripsPage
+          tripDetails={tripDetails}
+          allGroups={allGroups}
+          onSelectTrip={openTripDetail}
+          onCreateTrip={() => setPage(PAGES.TRIP_SETUP)}
+        />
+      )}
 
       {page === PAGES.TRIP_SETUP && (
         <TripSetupPage
@@ -123,25 +131,18 @@ export default function App() {
           availableCurrencies={availableCurrencies}
           tripDetails={tripDetails}
           onSave={saveTripDetails}
+          onCancel={tripDetails ? () => setPage(PAGES.MY_TRIPS) : null}
         />
       )}
 
-      {page === PAGES.TRIP_SUMMARY && (
-        <TripSummaryPage
+      {page === PAGES.TRIP_DETAIL && tripDetails && (
+        <TripDetailPage
           tripDetails={tripDetails}
           allGroups={allGroups}
-          onManageExpenses={() => {
-            if (tripDetails?.groupId) showDashboard(parseInt(tripDetails.groupId));
-          }}
+          onManageExpenses={openDashboard}
+          onViewAnalytics={() => setPage(PAGES.ANALYTICS)}
           onEditTrip={() => setPage(PAGES.TRIP_SETUP)}
-        />
-      )}
-
-      {page === PAGES.GROUPS && (
-        <GroupsPage
-          allGroups={allGroups}
-          onSelectGroup={showDashboard}
-          onRefresh={loadGroups}
+          onBack={() => setPage(PAGES.MY_TRIPS)}
         />
       )}
 
@@ -150,11 +151,15 @@ export default function App() {
           activeGroup={activeGroup}
           availableCurrencies={availableCurrencies}
           tripDetails={tripDetails}
-          onBack={() => {
-            loadGroups();
-            setPage(PAGES.GROUPS);
-          }}
+          onBack={() => setPage(PAGES.TRIP_DETAIL)}
           onRefresh={refreshAndShowDashboard}
+        />
+      )}
+
+      {page === PAGES.ANALYTICS && tripDetails && (
+        <AnalyticsPage
+          tripDetails={tripDetails}
+          onBack={() => setPage(PAGES.TRIP_DETAIL)}
         />
       )}
     </div>
