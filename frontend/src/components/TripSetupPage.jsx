@@ -16,6 +16,10 @@ export default function TripSetupPage({
   const [selectedCurrencies, setSelectedCurrencies] = useState(
     tripDetails?.currencies || []
   );
+  const [locations, setLocations] = useState(
+    tripDetails?.locations?.length ? tripDetails.locations : ["Bengaluru"]
+  );
+  const [cityInput, setCityInput] = useState("");
 
   const toggleCurrency = (code) => {
     setSelectedCurrencies((prev) =>
@@ -23,8 +27,27 @@ export default function TripSetupPage({
     );
   };
 
+  const addCity = () => {
+    const city = cityInput.trim();
+    if (city && !locations.includes(city)) {
+      setLocations((prev) => [...prev, city]);
+    }
+    setCityInput("");
+  };
+
+  const removeCity = (city) => {
+    setLocations((prev) => prev.filter((c) => c !== city));
+  };
+
+  const handleCityKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addCity();
+    }
+  };
+
   const handleSave = () => {
-    onSave({ name, start, end, groupId, currencies: selectedCurrencies });
+    onSave({ name, start, end, groupId, currencies: selectedCurrencies, locations });
   };
 
   return (
@@ -98,6 +121,49 @@ export default function TripSetupPage({
                 className="w-full border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+              Locations
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={cityInput}
+                onChange={(e) => setCityInput(e.target.value)}
+                onKeyDown={handleCityKeyDown}
+                className="flex-1 border border-gray-200 rounded-lg p-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Type a city name and press Enter"
+              />
+              <button
+                type="button"
+                onClick={addCity}
+                className="bg-emerald-600 text-white px-4 rounded-lg font-bold hover:bg-emerald-700 transition text-sm"
+              >
+                Add
+              </button>
+            </div>
+            {locations.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {locations.map((city) => (
+                  <span
+                    key={city}
+                    className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-200"
+                  >
+                    {city}
+                    <button
+                      type="button"
+                      onClick={() => removeCity(city)}
+                      className="text-emerald-400 hover:text-red-500 transition"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">

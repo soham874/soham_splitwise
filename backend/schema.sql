@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS trips (
     start_date      DATE          NULL,
     end_date        DATE          NULL,
     currencies      VARCHAR(1024) NOT NULL DEFAULT '',
+    locations       VARCHAR(2048) NOT NULL DEFAULT '',
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uq_user_id (user_id),

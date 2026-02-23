@@ -24,6 +24,7 @@ async def save_trip_details(request: Request):
         start_date=data.get("start") or None,
         end_date=data.get("end") or None,
         currencies=data.get("currencies", []),
+        locations=data.get("locations", []),
     )
     return {"status": "success", "trip": trip}
 
