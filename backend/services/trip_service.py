@@ -3,12 +3,12 @@ from typing import Optional
 from backend.db import get_connection
 
 
-def upsert_trip(user_token: str, group_id: str, name: str,
+def upsert_trip(user_id: int, group_id: str, name: str,
                 start_date: Optional[str], end_date: Optional[str],
                 currencies: list[str]) -> dict:
     """Insert or update a trip for the given user.
 
-    Each user has at most one active trip (enforced by UNIQUE on user_token).
+    Each user has at most one active trip (enforced by UNIQUE on user_id).
     """
     currencies_csv = ",".join(currencies) if currencies else ""
     conn = get_connection()
@@ -16,7 +16,7 @@ def upsert_trip(user_token: str, group_id: str, name: str,
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO trips (user_token, group_id, name, start_date, end_date, currencies)
+            INSERT INTO trips (user_id, group_id, name, start_date, end_date, currencies)
             VALUES (%s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 group_id   = VALUES(group_id),
@@ -25,7 +25,7 @@ def upsert_trip(user_token: str, group_id: str, name: str,
                 end_date   = VALUES(end_date),
                 currencies = VALUES(currencies)
             """,
-            (user_token, group_id, name,
+            (user_id, group_id, name,
              start_date or None, end_date or None, currencies_csv),
         )
         conn.commit()
@@ -33,18 +33,18 @@ def upsert_trip(user_token: str, group_id: str, name: str,
     finally:
         conn.close()
 
-    return get_trip(user_token)
+    return get_trip(user_id)
 
 
-def get_trip(user_token: str) -> Optional[dict]:
+def get_trip(user_id: int) -> Optional[dict]:
     """Return the trip for the given user, or None."""
     conn = get_connection()
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
             "SELECT group_id, name, start_date, end_date, currencies "
-            "FROM trips WHERE user_token = %s",
-            (user_token,),
+            "FROM trips WHERE user_id = %s",
+            (user_id,),
         )
         row = cursor.fetchone()
         cursor.close()

@@ -8,6 +8,7 @@ SESSION_ACCESS_TOKEN = "access_token"
 SESSION_ACCESS_TOKEN_SECRET = "access_token_secret"
 SESSION_RESOURCE_OWNER_KEY = "resource_owner_key"
 SESSION_RESOURCE_OWNER_SECRET = "resource_owner_secret"
+SESSION_USER_ID = "user_id"
 
 # Expense fetch limit
 DEFAULT_EXPENSE_LIMIT = 100

@@ -6,9 +6,11 @@ from backend.constants import (
     SESSION_ACCESS_TOKEN_SECRET,
     SESSION_RESOURCE_OWNER_KEY,
     SESSION_RESOURCE_OWNER_SECRET,
+    SESSION_USER_ID,
 )
 from backend.config import settings
-from backend.services import auth_service
+from backend.dependencies import get_oauth_session
+from backend.services import auth_service, splitwise_service, user_service
 
 router = APIRouter(tags=["auth"])
 
@@ -18,6 +20,7 @@ def check_login(request: Request):
     is_logged_in = (
         SESSION_ACCESS_TOKEN in request.session
         and SESSION_ACCESS_TOKEN_SECRET in request.session
+        and SESSION_USER_ID in request.session
     )
     return {"logged_in": is_logged_in}
 
@@ -39,6 +42,18 @@ def callback(request: Request, oauth_verifier: str):
     )
     request.session[SESSION_ACCESS_TOKEN] = tokens["oauth_token"]
     request.session[SESSION_ACCESS_TOKEN_SECRET] = tokens["oauth_token_secret"]
+
+    # Fetch the Splitwise profile and upsert into our users table
+    oauth = get_oauth_session(request)
+    sw_data = splitwise_service.fetch_current_user(oauth)
+    sw_user = sw_data.get("user", {})
+    db_user = user_service.upsert_user(
+        splitwise_id=sw_user.get("id"),
+        name=f"{sw_user.get('first_name', '')} {sw_user.get('last_name', '')}".strip(),
+        email=sw_user.get("email", ""),
+    )
+    request.session[SESSION_USER_ID] = db_user["id"]
+
     return RedirectResponse(url=settings.FRONTEND_URL)
 
 

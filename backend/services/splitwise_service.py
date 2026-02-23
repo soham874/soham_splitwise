@@ -3,6 +3,11 @@ from requests_oauthlib import OAuth1Session
 from backend.constants import BASE_API_URL, DEFAULT_EXPENSE_LIMIT
 
 
+def fetch_current_user(oauth: OAuth1Session) -> dict:
+    response = oauth.get(f"{BASE_API_URL}/get_current_user")
+    return response.json()
+
+
 def fetch_groups(oauth: OAuth1Session) -> dict:
     response = oauth.get(f"{BASE_API_URL}/get_groups")
     return response.json()
