@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { checkLogin, fetchGroups, fetchCurrencies, saveTripDetailsApi, getTripDetailsApi } from "./api";
+import { checkLogin, fetchGroups, fetchCurrencies, createTripApi, updateTripApi, deleteTripApi, getTripsApi } from "./api";
 import Navbar from "./components/Navbar";
 import LoadingOverlay from "./components/LoadingOverlay";
 import TripSetupPage from "./components/TripSetupPage";
@@ -7,6 +7,7 @@ import MyTripsPage from "./components/MyTripsPage";
 import TripDetailPage from "./components/TripDetailPage";
 import DashboardPage from "./components/DashboardPage";
 import AnalyticsPage from "./components/AnalyticsPage";
+import ConfirmDialog from "./components/ConfirmDialog";
 
 const PAGES = {
   LOADING: "loading",
@@ -22,8 +23,11 @@ export default function App() {
   const [allGroups, setAllGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [availableCurrencies, setAvailableCurrencies] = useState([]);
-  const [tripDetails, setTripDetails] = useState(null);
+  const [allTrips, setAllTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [editingTrip, setEditingTrip] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -57,20 +61,24 @@ export default function App() {
     }
   }, []);
 
+  const loadTrips = useCallback(async () => {
+    try {
+      const data = await getTripsApi();
+      const trips = data.trips || [];
+      setAllTrips(trips);
+      return trips;
+    } catch {
+      return [];
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         const data = await checkLogin();
         if (data.logged_in) {
           if (data.user) setCurrentUser(data.user);
-          const [, , tripData] = await Promise.all([
-            loadCurrencies(),
-            loadGroups(),
-            getTripDetailsApi(),
-          ]);
-          if (tripData.trip) {
-            setTripDetails(tripData.trip);
-          }
+          await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
           setPage(PAGES.MY_TRIPS);
         } else {
           window.location.href = "/login";
@@ -83,24 +91,47 @@ export default function App() {
   }, []);
 
   const saveTripDetails = async (details) => {
-    const result = await saveTripDetailsApi(details);
+    let result;
+    if (editingTrip?.id) {
+      result = await updateTripApi(editingTrip.id, details);
+    } else {
+      result = await createTripApi(details);
+    }
     const saved = result.trip || details;
-    setTripDetails(saved);
+    // Refresh the trips list
+    await loadTrips();
+    setSelectedTrip(saved);
     setPage(PAGES.MY_TRIPS);
   };
 
-  const openTripDetail = () => {
+  const openTripDetail = (trip) => {
+    setSelectedTrip(trip);
     setPage(PAGES.TRIP_DETAIL);
   };
 
   const openDashboard = () => {
-    if (!tripDetails?.groupId) return;
-    const gid = parseInt(tripDetails.groupId);
+    if (!selectedTrip?.groupId) return;
+    const gid = parseInt(selectedTrip.groupId);
     const group = allGroups.find((g) => g.id === gid);
     if (group) {
       setActiveGroup(group);
       setPage(PAGES.DASHBOARD);
     }
+  };
+
+  const handleDeleteTrip = (tripId) => {
+    setConfirmDialog({
+      title: "Delete Trip",
+      message: "This will permanently delete this trip and all its expenses. This cannot be undone.",
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        await deleteTripApi(tripId);
+        await loadTrips();
+        setSelectedTrip(null);
+        setPage(PAGES.MY_TRIPS);
+      },
+      onCancel: () => setConfirmDialog(null),
+    });
   };
 
   const refreshAndShowDashboard = async (groupId) => {
@@ -120,10 +151,10 @@ export default function App() {
 
       {page === PAGES.MY_TRIPS && (
         <MyTripsPage
-          tripDetails={tripDetails}
+          allTrips={allTrips}
           allGroups={allGroups}
           onSelectTrip={openTripDetail}
-          onCreateTrip={() => setPage(PAGES.TRIP_SETUP)}
+          onCreateTrip={() => { setEditingTrip(null); setPage(PAGES.TRIP_SETUP); }}
         />
       )}
 
@@ -131,19 +162,20 @@ export default function App() {
         <TripSetupPage
           allGroups={allGroups}
           availableCurrencies={availableCurrencies}
-          tripDetails={tripDetails}
+          tripDetails={editingTrip}
           onSave={saveTripDetails}
-          onCancel={tripDetails ? () => setPage(PAGES.MY_TRIPS) : null}
+          onCancel={() => setPage(PAGES.MY_TRIPS)}
         />
       )}
 
-      {page === PAGES.TRIP_DETAIL && tripDetails && (
+      {page === PAGES.TRIP_DETAIL && selectedTrip && (
         <TripDetailPage
-          tripDetails={tripDetails}
+          tripDetails={selectedTrip}
           allGroups={allGroups}
           onManageExpenses={openDashboard}
           onViewAnalytics={() => setPage(PAGES.ANALYTICS)}
-          onEditTrip={() => setPage(PAGES.TRIP_SETUP)}
+          onEditTrip={() => { setEditingTrip(selectedTrip); setPage(PAGES.TRIP_SETUP); }}
+          onDeleteTrip={() => handleDeleteTrip(selectedTrip.id)}
           onBack={() => setPage(PAGES.MY_TRIPS)}
         />
       )}
@@ -152,17 +184,25 @@ export default function App() {
         <DashboardPage
           activeGroup={activeGroup}
           availableCurrencies={availableCurrencies}
-          tripDetails={tripDetails}
+          tripDetails={selectedTrip}
           currentUser={currentUser}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
           onRefresh={refreshAndShowDashboard}
         />
       )}
 
-      {page === PAGES.ANALYTICS && tripDetails && (
+      {page === PAGES.ANALYTICS && selectedTrip && (
         <AnalyticsPage
-          tripDetails={tripDetails}
+          tripDetails={selectedTrip}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
+        />
+      )}
+      {confirmDialog && (
+        <ConfirmDialog
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
         />
       )}
     </div>

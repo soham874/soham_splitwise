@@ -54,10 +54,12 @@ export default function TripSetupPage({
     <div className="container mx-auto py-6 px-4 max-w-xl">
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Setup Your Trip
+          {tripDetails ? "Edit Trip Details" : "Setup Your Trip"}
         </h2>
         <p className="text-gray-500 text-sm mb-6">
-          Link your Splitwise group and set trip dates.
+          {tripDetails
+            ? "Update your trip settings below."
+            : "Link your Splitwise group and set trip dates."}
         </p>
 
         <div className="mb-4">

@@ -41,8 +41,8 @@ export async function fetchCurrencies() {
   return res.json();
 }
 
-export async function saveTripDetailsApi(details) {
-  const res = await apiFetch("/save_trip_details", {
+export async function createTripApi(details) {
+  const res = await apiFetch("/create_trip", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(details),
@@ -50,7 +50,21 @@ export async function saveTripDetailsApi(details) {
   return res.json();
 }
 
-export async function getTripDetailsApi() {
-  const res = await apiFetch("/get_trip_details");
+export async function updateTripApi(tripId, details) {
+  const res = await apiFetch(`/update_trip/${tripId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(details),
+  });
+  return res.json();
+}
+
+export async function deleteTripApi(tripId) {
+  const res = await apiFetch(`/delete_trip/${tripId}`, { method: "POST" });
+  return res.json();
+}
+
+export async function getTripsApi() {
+  const res = await apiFetch("/get_trips");
   return res.json();
 }

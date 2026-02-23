@@ -13,12 +13,8 @@ def _get_user_id(request: Request) -> int:
     return user_id
 
 
-@router.post("/save_trip_details")
-async def save_trip_details(request: Request):
-    user_id = _get_user_id(request)
-    data = await request.json()
-    trip = trip_service.upsert_trip(
-        user_id=user_id,
+def _parse_trip_data(data: dict) -> dict:
+    return dict(
         group_id=str(data.get("groupId", "")),
         name=data.get("name", ""),
         start_date=data.get("start") or None,
@@ -26,13 +22,42 @@ async def save_trip_details(request: Request):
         currencies=data.get("currencies", []),
         locations=data.get("locations", []),
     )
+
+
+@router.post("/create_trip")
+async def create_trip(request: Request):
+    user_id = _get_user_id(request)
+    data = await request.json()
+    trip = trip_service.create_trip(user_id=user_id, **_parse_trip_data(data))
     return {"status": "success", "trip": trip}
 
 
-@router.get("/get_trip_details")
-def get_trip_details(request: Request):
+@router.post("/update_trip/{trip_id}")
+async def update_trip(request: Request, trip_id: int):
+    _get_user_id(request)
+    data = await request.json()
+    trip = trip_service.update_trip(trip_id=trip_id, **_parse_trip_data(data))
+    return {"status": "success", "trip": trip}
+
+
+@router.get("/get_trips")
+def get_trips(request: Request):
     user_id = _get_user_id(request)
-    trip = trip_service.get_trip(user_id)
+    trips = trip_service.get_trips(user_id)
+    return {"trips": trips}
+
+
+@router.post("/delete_trip/{trip_id}")
+def delete_trip(request: Request, trip_id: int):
+    _get_user_id(request)
+    trip_service.delete_trip(trip_id)
+    return {"status": "success"}
+
+
+@router.get("/get_trip/{trip_id}")
+def get_trip(request: Request, trip_id: int):
+    _get_user_id(request)
+    trip = trip_service.get_trip_by_id(trip_id)
     if trip is None:
         return {"trip": None}
     return {"trip": trip}
