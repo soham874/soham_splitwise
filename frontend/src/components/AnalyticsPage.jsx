@@ -98,10 +98,27 @@ function BreakdownPanel({ title, icon, data, colorKey }) {
   );
 }
 
+const TABS = [
+  { id: "update", label: "Update", icon: "M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+  { id: "expenses", label: "Expenses", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" },
+  { id: "breakdown", label: "Breakdown", icon: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" },
+];
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div className="bg-white/10 rounded-xl p-3 md:p-4">
+      <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-wider mb-0.5">{label}</p>
+      <p className="text-lg md:text-xl font-bold font-mono">{value}</p>
+      {sub && <p className="text-emerald-300 text-[10px] mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+}
+
 export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
   const [expenses, setExpenses] = useState([]);
   const [editState, setEditState] = useState({});
   const [saving, setSaving] = useState({});
+  const [activeTab, setActiveTab] = useState("update");
 
   const tripLocations = tripDetails?.locations || [];
   const groupId = tripDetails?.groupId;
@@ -155,6 +172,16 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
     [allExpenses, groupBy]
   );
 
+  /* ── Detailed stats ── */
+  const stats = useMemo(() => {
+    if (allExpenses.length === 0) return null;
+    const maxExpense = allExpenses.reduce((m, e) => (e.amount_inr || 0) > (m.amount_inr || 0) ? e : m, allExpenses[0]);
+    const topCategory = byCategory[0] || { label: "—", value: 0 };
+    const topLocation = byLocation[0] || { label: "—", value: 0 };
+    const topDate = byDate[0] || { label: "—", value: 0 };
+    return { maxExpense, topCategory, topLocation, topDate };
+  }, [allExpenses, byCategory, byLocation, byDate]);
+
   const getEdit = (id) =>
     editState[id] || {};
 
@@ -187,7 +214,7 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
     <div className="container mx-auto py-4 md:py-8 px-4 max-w-5xl">
       <button
         onClick={onBack}
-        className="flex items-center text-emerald-600 font-semibold mb-6 hover:translate-x-[-4px] transition-transform"
+        className="flex items-center text-emerald-600 font-semibold mb-4 hover:translate-x-[-4px] transition-transform"
       >
         <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -195,249 +222,276 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
         Back to Trip
       </button>
 
-      <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
-        Analytics
-      </h2>
-      <p className="text-sm text-gray-500 mb-8">
-        <span className="font-semibold text-gray-700">{tripDetails?.name}</span>
-        {tripDetails?.start && tripDetails?.end && (
-          <span className="ml-2 text-gray-400">
-            {tripDetails.start} — {tripDetails.end}
-          </span>
-        )}
-      </p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-6">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Analytics</h2>
+          <p className="text-sm text-gray-500">
+            <span className="font-semibold text-gray-700">{tripDetails?.name}</span>
+            {tripDetails?.start && tripDetails?.end && (
+              <span className="ml-2 text-gray-400">{tripDetails.start} — {tripDetails.end}</span>
+            )}
+          </p>
+        </div>
+      </div>
 
-      {/* ── Section 1: Update Expenses ── */}
-      <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      {/* ── Tab bar ── */}
+      <div className="flex border-b border-gray-200 mb-6 gap-1 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+              activeTab === tab.id
+                ? "border-emerald-600 text-emerald-700"
+                : "border-transparent text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon} />
             </svg>
-          </div>
-          <h3 className="text-lg font-bold text-gray-800">
-            Update Expenses
-            {incomplete.length > 0 && (
-              <span className="ml-2 text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                {incomplete.length} pending
+            {tab.label}
+            {tab.id === "update" && incomplete.length > 0 && (
+              <span className="ml-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                {incomplete.length}
               </span>
             )}
-          </h3>
-        </div>
+          </button>
+        ))}
+      </div>
 
-        {incomplete.length === 0 ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
-            <p className="text-emerald-700 font-semibold text-sm">
-              All expenses have location and category set!
-            </p>
+      {/* ── Tab: Update Expenses ── */}
+      {activeTab === "update" && (
+        <section>
+          {incomplete.length === 0 ? (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+              <p className="text-emerald-700 font-semibold text-sm">
+                All expenses have location and category set!
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs md:text-sm min-w-[700px]">
+                  <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3 border-b">Date</th>
+                      <th className="p-3 border-b">Description</th>
+                      <th className="p-3 border-b text-right">INR</th>
+                      <th className="p-3 border-b">Location</th>
+                      <th className="p-3 border-b">Category</th>
+                      <th className="p-3 border-b text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incomplete.map((exp) => {
+                      const edits = getEdit(exp.id);
+                      const loc = edits.location ?? exp.location ?? "";
+                      const cat = edits.category ?? exp.category ?? "";
+                      const isSaving = saving[exp.id];
+                      const canSave = loc && cat;
+                      return (
+                        <tr key={exp.id} className="border-b border-gray-50 hover:bg-amber-50/40">
+                          <td className="p-3 text-gray-500 text-xs whitespace-nowrap">
+                            {exp.date || "—"}
+                          </td>
+                          <td className="p-3 font-semibold text-gray-800">
+                            {exp.description}
+                          </td>
+                          <td className="p-3 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
+                            {exp.amount_inr?.toFixed(2)}
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={loc}
+                              onChange={(e) => setField(exp.id, "location", e.target.value)}
+                              className={`w-full border rounded-lg px-2 py-1.5 text-xs bg-white outline-none ${
+                                !loc ? "border-amber-300 bg-amber-50" : "border-gray-200"
+                              }`}
+                            >
+                              <option value="">Select...</option>
+                              {tripLocations.map((l) => (
+                                <option key={l} value={l}>{l}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={cat}
+                              onChange={(e) => setField(exp.id, "category", e.target.value)}
+                              className={`w-full border rounded-lg px-2 py-1.5 text-xs bg-white outline-none ${
+                                !cat ? "border-amber-300 bg-amber-50" : "border-gray-200"
+                              }`}
+                            >
+                              <option value="">Select...</option>
+                              {EXPENSE_CATEGORIES.map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              onClick={() => handleSave(exp)}
+                              disabled={!canSave || isSaving}
+                              className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-40 disabled:bg-gray-300 transition"
+                            >
+                              {isSaving ? "..." : "Save"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Tab: Expenses ── */}
+      {activeTab === "expenses" && (
+        <section>
+          {/* Summary banner */}
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl p-5 md:p-8 text-white mb-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4">
+              <div>
+                <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-1">
+                  Grand Total Spent
+                </p>
+                <p className="text-3xl md:text-4xl font-bold font-mono">
+                  INR {grandTotal.toFixed(2)}
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <StatCard label="Expenses" value={allExpenses.length} />
+                <StatCard
+                  label="Avg / Expense"
+                  value={allExpenses.length > 0 ? (grandTotal / allExpenses.length).toFixed(0) : "0"}
+                />
+              </div>
+            </div>
+
+            {stats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <StatCard
+                  label="Costliest Expense"
+                  value={stats.maxExpense.amount_inr?.toFixed(0)}
+                  sub={stats.maxExpense.description}
+                />
+                <StatCard
+                  label="Top Category"
+                  value={stats.topCategory.value.toFixed(0)}
+                  sub={stats.topCategory.label}
+                />
+                <StatCard
+                  label="Top Location"
+                  value={stats.topLocation.value.toFixed(0)}
+                  sub={stats.topLocation.label}
+                />
+                <StatCard
+                  label="Highest Day"
+                  value={stats.topDate.value.toFixed(0)}
+                  sub={stats.topDate.label}
+                />
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs md:text-sm min-w-[700px]">
-                <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="p-3 border-b">Date</th>
-                    <th className="p-3 border-b">Description</th>
-                    <th className="p-3 border-b text-right">INR</th>
-                    <th className="p-3 border-b">Location</th>
-                    <th className="p-3 border-b">Category</th>
-                    <th className="p-3 border-b text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incomplete.map((exp) => {
-                    const edits = getEdit(exp.id);
-                    const loc = edits.location ?? exp.location ?? "";
-                    const cat = edits.category ?? exp.category ?? "";
-                    const isSaving = saving[exp.id];
-                    const canSave = loc && cat;
-                    return (
-                      <tr key={exp.id} className="border-b border-gray-50 hover:bg-amber-50/40">
+
+          {/* Expense list table */}
+          {allExpenses.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider">
+                    <tr>
+                      <th className="p-3 border-b">Date</th>
+                      <th className="p-3 border-b">Description</th>
+                      <th className="p-3 border-b">Location</th>
+                      <th className="p-3 border-b">Category</th>
+                      <th className="p-3 border-b text-right">Amount (INR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allExpenses.map((exp) => (
+                      <tr key={exp.id} className="border-b border-gray-50 hover:bg-gray-50 text-[13px]">
                         <td className="p-3 text-gray-500 text-xs whitespace-nowrap">
                           {exp.date || "—"}
                         </td>
                         <td className="p-3 font-semibold text-gray-800">
                           {exp.description}
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-emerald-600 whitespace-nowrap">
+                        <td className="p-3 text-gray-600">
+                          {exp.location || (
+                            <span className="text-amber-500 italic text-xs">Not set</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {exp.category ? (
+                            <span className="bg-gray-100 text-gray-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                              {exp.category}
+                            </span>
+                          ) : (
+                            <span className="text-amber-500 italic text-xs">Not set</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-emerald-600">
                           {exp.amount_inr?.toFixed(2)}
                         </td>
-                        <td className="p-3">
-                          <select
-                            value={loc}
-                            onChange={(e) => setField(exp.id, "location", e.target.value)}
-                            className={`w-full border rounded-lg px-2 py-1.5 text-xs bg-white outline-none ${
-                              !loc ? "border-amber-300 bg-amber-50" : "border-gray-200"
-                            }`}
-                          >
-                            <option value="">Select...</option>
-                            {tripLocations.map((l) => (
-                              <option key={l} value={l}>{l}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="p-3">
-                          <select
-                            value={cat}
-                            onChange={(e) => setField(exp.id, "category", e.target.value)}
-                            className={`w-full border rounded-lg px-2 py-1.5 text-xs bg-white outline-none ${
-                              !cat ? "border-amber-300 bg-amber-50" : "border-gray-200"
-                            }`}
-                          >
-                            <option value="">Select...</option>
-                            {EXPENSE_CATEGORIES.map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="p-3 text-center">
-                          <button
-                            onClick={() => handleSave(exp)}
-                            disabled={!canSave || isSaving}
-                            className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-emerald-700 disabled:opacity-40 disabled:bg-gray-300 transition"
-                          >
-                            {isSaving ? "..." : "Save"}
-                          </button>
-                        </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── Section 2: Expenses Summary ── */}
-      <section className="mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
-            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-bold text-gray-800">Expenses</h3>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-2xl p-6 md:p-8 text-white">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <p className="text-emerald-200 text-xs font-bold uppercase tracking-wider mb-1">
-                Grand Total Spent
-              </p>
-              <p className="text-3xl md:text-4xl font-bold font-mono">
-                INR {grandTotal.toFixed(2)}
-              </p>
-            </div>
-            <div className="flex gap-6">
-              <div className="text-right">
-                <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-wider">Expenses</p>
-                <p className="text-xl font-bold">{allExpenses.length}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-emerald-200 text-[10px] font-bold uppercase tracking-wider">Avg / Expense</p>
-                <p className="text-xl font-bold font-mono">
-                  {allExpenses.length > 0 ? (grandTotal / allExpenses.length).toFixed(2) : "0.00"}
-                </p>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Expense list table */}
-        {allExpenses.length > 0 && (
-          <div className="mt-4 bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="p-3 border-b">Date</th>
-                    <th className="p-3 border-b">Description</th>
-                    <th className="p-3 border-b">Location</th>
-                    <th className="p-3 border-b">Category</th>
-                    <th className="p-3 border-b text-right">Amount (INR)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allExpenses.map((exp) => (
-                    <tr key={exp.id} className="border-b border-gray-50 hover:bg-gray-50 text-[13px]">
-                      <td className="p-3 text-gray-500 text-xs whitespace-nowrap">
-                        {exp.date || "—"}
-                      </td>
-                      <td className="p-3 font-semibold text-gray-800">
-                        {exp.description}
-                      </td>
-                      <td className="p-3 text-gray-600">
-                        {exp.location || (
-                          <span className="text-amber-500 italic text-xs">Not set</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-gray-600">
-                        {exp.category ? (
-                          <span className="bg-gray-100 text-gray-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                            {exp.category}
-                          </span>
-                        ) : (
-                          <span className="text-amber-500 italic text-xs">Not set</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-600">
-                        {exp.amount_inr?.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {allExpenses.length === 0 && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+              <p className="text-gray-500 text-sm">No expenses recorded yet.</p>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
-      {/* ── Section 3: Expense Breakdown ── */}
-      {allExpenses.length > 0 && (
-        <section className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-              </svg>
+      {/* ── Tab: Breakdown ── */}
+      {activeTab === "breakdown" && (
+        <section>
+          {allExpenses.length === 0 ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+              <p className="text-gray-500 text-sm">No expenses to break down.</p>
             </div>
-            <h3 className="text-lg font-bold text-gray-800">Expense Breakdown</h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <BreakdownPanel
-              title="By Category"
-              icon={
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-              }
-              data={byCategory}
-            />
-            <BreakdownPanel
-              title="By Location"
-              icon={
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              }
-              data={byLocation}
-            />
-            <BreakdownPanel
-              title="By Date"
-              icon={
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              }
-              data={byDate}
-            />
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <BreakdownPanel
+                title="By Category"
+                icon={
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                }
+                data={byCategory}
+              />
+              <BreakdownPanel
+                title="By Location"
+                icon={
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                }
+                data={byLocation}
+              />
+              <BreakdownPanel
+                title="By Date"
+                icon={
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                }
+                data={byDate}
+              />
+            </div>
+          )}
         </section>
       )}
     </div>

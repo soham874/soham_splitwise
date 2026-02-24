@@ -104,18 +104,70 @@ export default function ExpenseForm({
   const handleSplitChange = (index, field, value) => {
     setMemberSplits((prev) => {
       const total = parseFloat(totalCost || 0);
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      if (field === "percent" && total > 0) {
-        updated[index].owedAmt = (
-          total *
-          (parseFloat(value || 0) / 100)
-        ).toFixed(2);
+      const updated = prev.map((s) => ({ ...s }));
+      updated[index][field] = value;
+
+      if (field === "paid") {
+        // Auto-balance paid across other members
+        const editedPaid = parseFloat(value || 0);
+        const otherCount = updated.length - 1;
+        if (otherCount > 0) {
+          const remainder = Math.max(0, total - editedPaid);
+          const each = (remainder / otherCount).toFixed(2);
+          let distributed = 0;
+          updated.forEach((s, i) => {
+            if (i !== index) {
+              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                s.paid = (remainder - distributed).toFixed(2);
+              } else {
+                s.paid = each;
+                distributed += parseFloat(each);
+              }
+            }
+          });
+        }
+      } else if (field === "percent" && total > 0) {
+        updated[index].owedAmt = (total * (parseFloat(value || 0) / 100)).toFixed(2);
+        // Auto-balance owed across other members
+        const editedOwed = parseFloat(updated[index].owedAmt);
+        const otherCount = updated.length - 1;
+        if (otherCount > 0) {
+          const remainder = Math.max(0, total - editedOwed);
+          const each = (remainder / otherCount).toFixed(2);
+          let distributed = 0;
+          updated.forEach((s, i) => {
+            if (i !== index) {
+              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                s.owedAmt = (remainder - distributed).toFixed(2);
+              } else {
+                s.owedAmt = each;
+                distributed += parseFloat(each);
+              }
+              s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
+            }
+          });
+        }
       } else if (field === "owedAmt" && total > 0) {
-        updated[index].percent = (
-          (parseFloat(value || 0) / total) *
-          100
-        ).toFixed(1);
+        updated[index].percent = ((parseFloat(value || 0) / total) * 100).toFixed(1);
+        // Auto-balance owed across other members
+        const editedOwed = parseFloat(value || 0);
+        const otherCount = updated.length - 1;
+        if (otherCount > 0) {
+          const remainder = Math.max(0, total - editedOwed);
+          const each = (remainder / otherCount).toFixed(2);
+          let distributed = 0;
+          updated.forEach((s, i) => {
+            if (i !== index) {
+              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                s.owedAmt = (remainder - distributed).toFixed(2);
+              } else {
+                s.owedAmt = each;
+                distributed += parseFloat(each);
+              }
+              s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
+            }
+          });
+        }
       }
       return updated;
     });
@@ -347,72 +399,59 @@ export default function ExpenseForm({
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
             Notes / Details
           </label>
-          <textarea
+          <input
+            type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-y"
-            rows="3"
-            style={{ minHeight: "80px" }}
+            className="w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
             placeholder="Add notes..."
           />
         </div>
       </div>
 
-      <div className="table-container overflow-x-auto -mx-4 md:mx-0 border-t border-gray-100">
-        <table className="w-full text-left text-xs md:text-sm min-w-[500px]">
+      <div className="overflow-x-auto -mx-3 md:mx-0 border-t border-gray-100">
+        <table className="w-full text-left text-[11px] md:text-xs">
           <thead>
-            <tr className="text-gray-400 uppercase text-[10px] tracking-wider">
-              <th className="p-4 font-bold">Member</th>
-              <th className="p-4 font-bold w-32">Paid</th>
-              <th className="p-4 font-bold w-24">Owed (%)</th>
-              <th className="p-4 font-bold w-32 text-right">Owed (Amount)</th>
+            <tr className="text-gray-400 uppercase text-[9px] md:text-[10px] tracking-wider">
+              <th className="px-1.5 py-1 md:p-3 font-bold">Member</th>
+              <th className="px-1.5 py-1 md:p-3 font-bold w-20 md:w-32">Paid</th>
+              <th className="px-1.5 py-1 md:p-3 font-bold w-16 md:w-24">%</th>
+              <th className="px-1.5 py-1 md:p-3 font-bold w-20 md:w-32 text-right">Owed</th>
             </tr>
           </thead>
           <tbody>
             {memberSplits.map((s, i) => (
               <tr key={s.id} className="border-b border-gray-50">
-                <td className="p-4 font-bold text-gray-700 text-xs">
+                <td className="px-1.5 py-1 md:p-3 font-bold text-gray-700 text-[11px] md:text-xs">
                   {s.name}
                 </td>
-                <td
-                  className={`p-4 ${splitEqually ? "disabled-row" : ""}`}
-                >
+                <td className={`px-1.5 py-1 md:p-3 ${splitEqually ? "disabled-row" : ""}`}>
                   <input
                     type="number"
                     step="0.01"
                     value={s.paid}
-                    onChange={(e) =>
-                      handleSplitChange(i, "paid", e.target.value)
-                    }
-                    className="w-full p-2 border rounded text-xs font-mono"
+                    onChange={(e) => handleSplitChange(i, "paid", e.target.value)}
+                    className="w-full p-1 md:p-2 border rounded text-[11px] md:text-xs font-mono"
                     disabled={splitEqually && payerId !== "multiple"}
                   />
                 </td>
-                <td
-                  className={`p-4 ${splitEqually ? "disabled-row" : ""}`}
-                >
+                <td className={`px-1.5 py-1 md:p-3 ${splitEqually ? "disabled-row" : ""}`}>
                   <input
                     type="number"
                     step="0.1"
                     value={s.percent}
-                    onChange={(e) =>
-                      handleSplitChange(i, "percent", e.target.value)
-                    }
-                    className="w-full p-2 border rounded text-xs font-mono"
+                    onChange={(e) => handleSplitChange(i, "percent", e.target.value)}
+                    className="w-full p-1 md:p-2 border rounded text-[11px] md:text-xs font-mono"
                     disabled={splitEqually}
                   />
                 </td>
-                <td
-                  className={`p-4 text-right ${splitEqually ? "disabled-row" : ""}`}
-                >
+                <td className={`px-1.5 py-1 md:p-3 text-right ${splitEqually ? "disabled-row" : ""}`}>
                   <input
                     type="number"
                     step="0.01"
                     value={s.owedAmt}
-                    onChange={(e) =>
-                      handleSplitChange(i, "owedAmt", e.target.value)
-                    }
-                    className="w-full p-2 border rounded text-xs text-right font-mono bg-gray-50"
+                    onChange={(e) => handleSplitChange(i, "owedAmt", e.target.value)}
+                    className="w-full p-1 md:p-2 border rounded text-[11px] md:text-xs text-right font-mono bg-gray-50"
                     disabled={splitEqually}
                   />
                 </td>
@@ -422,28 +461,20 @@ export default function ExpenseForm({
         </table>
       </div>
 
-      <div className="mt-6 flex flex-col md:flex-row justify-between items-center gap-4 border-t pt-6">
-        <div className="flex items-center w-full md:w-auto justify-between md:justify-start">
-          <div className="text-xs md:text-sm space-x-4">
-            <span className="text-gray-400 font-medium">
-              Paid:{" "}
-              <span className="text-gray-900 font-bold">
-                {sumPaid.toFixed(2)}
-              </span>
-            </span>
-            <span className="text-gray-400 font-medium">
-              Owed:{" "}
-              <span className="text-gray-900 font-bold">
-                {sumOwed.toFixed(2)}
-              </span>
-            </span>
-          </div>
+      <div className="mt-2 md:mt-6 flex flex-row justify-between items-center gap-2 md:gap-4 border-t pt-2 md:pt-6">
+        <div className="text-[10px] md:text-sm space-x-2 md:space-x-4">
+          <span className="text-gray-400 font-medium">
+            Paid: <span className="text-gray-900 font-bold">{sumPaid.toFixed(2)}</span>
+          </span>
+          <span className="text-gray-400 font-medium">
+            Owed: <span className="text-gray-900 font-bold">{sumOwed.toFixed(2)}</span>
+          </span>
         </div>
-        <div className="flex gap-3 w-full md:w-auto">
+        <div className="flex gap-2">
           {editId && (
             <button
               onClick={resetForm}
-              className="w-full md:w-auto bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-600 transition shadow-lg shadow-red-100"
+              className="bg-red-500 text-white px-4 py-2 md:px-8 md:py-3 rounded-xl text-xs md:text-sm font-bold hover:bg-red-600 transition"
             >
               Cancel
             </button>
@@ -451,9 +482,9 @@ export default function ExpenseForm({
           <button
             onClick={handleSubmit}
             disabled={isDisabled}
-            className="w-full md:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:bg-gray-300"
+            className="bg-emerald-600 text-white px-4 py-2 md:px-8 md:py-3 rounded-xl text-xs md:text-sm font-bold hover:bg-emerald-700 transition disabled:opacity-50 disabled:bg-gray-300"
           >
-            {editId ? "Update Expense" : "Create Expense"}
+            {editId ? "Update" : "Create"}
           </button>
         </div>
       </div>
