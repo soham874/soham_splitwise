@@ -11,8 +11,10 @@ const EXPENSE_CATEGORIES = [
   "Memento",
   "Sight Seeing",
   "Misc",
-  "Transit",
-  "Stays",
+  "Transit - Flight",
+  "Transit - Train",
+  "Stays - Hotel",
+  "Stays - Hostel"
 ];
 
 const PIE_COLORS = [
