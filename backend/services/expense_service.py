@@ -187,3 +187,54 @@ def get_expenses_by_trip(trip_id: str) -> list[dict]:
             row["updated_at"] = str(row["updated_at"])
 
     return rows
+
+
+def get_user_expenses_by_trip(trip_id: str, splitwise_user_id: int) -> list[dict]:
+    """Return expense rows for a specific user in a trip, ordered by date desc."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT id, trip_id, user_id, expense_id, location, category,
+                   description, amount_inr, currency_code, original_amount,
+                   date, created_at, updated_at
+            FROM expenses
+            WHERE trip_id = %s AND user_id = %s
+            ORDER BY date DESC, created_at DESC
+            """,
+            (trip_id, splitwise_user_id),
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+    finally:
+        conn.close()
+
+    for row in rows:
+        if isinstance(row.get("amount_inr"), Decimal):
+            row["amount_inr"] = float(row["amount_inr"])
+        if isinstance(row.get("original_amount"), Decimal):
+            row["original_amount"] = float(row["original_amount"])
+        if row.get("date"):
+            row["date"] = str(row["date"])
+        if row.get("created_at"):
+            row["created_at"] = str(row["created_at"])
+        if row.get("updated_at"):
+            row["updated_at"] = str(row["updated_at"])
+
+    return rows
+
+
+def update_expense_details(expense_row_id: int, location: str, category: str) -> None:
+    """Update location and category on a single expense row by its PK."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE expenses SET location = %s, category = %s WHERE id = %s",
+            (location, category, expense_row_id),
+        )
+        conn.commit()
+        cursor.close()
+    finally:
+        conn.close()

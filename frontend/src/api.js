@@ -68,3 +68,17 @@ export async function getTripsApi() {
   const res = await apiFetch("/get_trips");
   return res.json();
 }
+
+export async function fetchMyExpenses(groupId) {
+  const res = await apiFetch(`/get_my_expenses/${groupId}?t=${Date.now()}`);
+  return res.json();
+}
+
+export async function updateExpenseDetails(id, location, category) {
+  const res = await apiFetch("/update_expense_details", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, location, category }),
+  });
+  return res.json();
+}

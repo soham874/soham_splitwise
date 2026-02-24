@@ -100,3 +100,31 @@ def delete_expense(request: Request, expense_id: str):
         return splitwise_service.delete_expense(oauth, expense_id)
 
     return {"success": True}
+
+
+@router.get("/get_my_expenses/{group_id}")
+def get_my_expenses(request: Request, group_id: str):
+    """Return local expense rows for the logged-in user in a given trip/group."""
+    db_user_id = request.session.get(SESSION_USER_ID)
+    if not db_user_id:
+        return {"expenses": []}
+    db_user = user_service.get_user_by_id(db_user_id)
+    if not db_user:
+        return {"expenses": []}
+    rows = expense_service.get_user_expenses_by_trip(group_id, db_user["splitwise_id"])
+    return {"expenses": rows}
+
+
+@router.post("/update_expense_details")
+async def update_expense_details(request: Request):
+    """Update location and category on a single expense row."""
+    db_user_id = request.session.get(SESSION_USER_ID)
+    if not db_user_id:
+        return {"status": "error", "detail": "Not authenticated"}
+    data = await request.json()
+    expense_service.update_expense_details(
+        expense_row_id=data["id"],
+        location=data.get("location", ""),
+        category=data.get("category", ""),
+    )
+    return {"status": "success"}

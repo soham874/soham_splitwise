@@ -10,6 +10,10 @@ const EXPENSE_CATEGORIES = [
   "Memento",
   "Sight Seeing",
   "Misc",
+  "Transit - Flight",
+  "Transit - Train",
+  "Stays - Hotel",
+  "Stays - Hostel"
 ];
 
 export default function ExpenseForm({
@@ -26,8 +30,8 @@ export default function ExpenseForm({
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState(currencies[0]?.currency_code || "INR");
   const [splitEqually, setSplitEqually] = useState(true);
-  const [location, setLocation] = useState(tripLocations[0] || "");
-  const [category, setCategory] = useState(EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]);
+  const [location, setLocation] = useState("");
+  const [category, setCategory] = useState("");
   const skipRecalcRef = useRef(false);
 
   // Resolve the default payer to the logged-in user if they are a group member
@@ -155,8 +159,8 @@ export default function ExpenseForm({
     setNotes("");
     setSplitEqually(true);
     setCurrency(currencies[0]?.currency_code || "INR");
-    setLocation(tripLocations[0] || "");
-    setCategory(EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]);
+    setLocation("");
+    setCategory("");
     setPayerId(resolveDefaultPayer());
     setMemberSplits(
       activeGroup.members.map((m) => ({
@@ -202,6 +206,8 @@ export default function ExpenseForm({
     setTotalCost(exp.cost);
     setNotes(exp.details || "");
     setCurrency(exp.currency_code);
+    setLocation(exp.location || "");
+    setCategory(exp.category || "");
     setPayerId(resolvedPayer);
     setSplitEqually(false);
     setMemberSplits(loadedSplits);
@@ -312,9 +318,7 @@ export default function ExpenseForm({
             onChange={(e) => setLocation(e.target.value)}
             className="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
           >
-            {tripLocations.length === 0 && (
-              <option value="">No locations set</option>
-            )}
+            <option value="">{tripLocations.length === 0 ? "No locations set" : "Select location..."}</option>
             {tripLocations.map((loc) => (
               <option key={loc} value={loc}>
                 {loc}
@@ -331,6 +335,7 @@ export default function ExpenseForm({
             onChange={(e) => setCategory(e.target.value)}
             className="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
           >
+            <option value="">Select category...</option>
             {EXPENSE_CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
@@ -433,22 +438,24 @@ export default function ExpenseForm({
               </span>
             </span>
           </div>
+        </div>
+        <div className="flex gap-3 w-full md:w-auto">
           {editId && (
             <button
               onClick={resetForm}
-              className="ml-4 text-xs text-red-600 font-bold hover:underline uppercase"
+              className="w-full md:w-auto bg-red-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-600 transition shadow-lg shadow-red-100"
             >
               Cancel
             </button>
           )}
+          <button
+            onClick={handleSubmit}
+            disabled={isDisabled}
+            className="w-full md:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:bg-gray-300"
+          >
+            {editId ? "Update Expense" : "Create Expense"}
+          </button>
         </div>
-        <button
-          onClick={handleSubmit}
-          disabled={isDisabled}
-          className="w-full md:w-auto bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:bg-gray-300"
-        >
-          {editId ? "Update Expense" : "Create Expense"}
-        </button>
       </div>
     </section>
   );

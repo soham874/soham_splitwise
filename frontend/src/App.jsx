@@ -195,6 +195,7 @@ export default function App() {
       {page === PAGES.ANALYTICS && selectedTrip && (
         <AnalyticsPage
           tripDetails={selectedTrip}
+          currentUser={currentUser}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
         />
       )}
