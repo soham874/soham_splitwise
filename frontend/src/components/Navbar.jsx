@@ -18,7 +18,7 @@ export default function Navbar({ onHome }) {
             My Trips
           </button>
           <a
-            href="/logout"
+            href="/api/logout"
             className="bg-emerald-700 hover:bg-emerald-800 px-3 py-2 rounded text-xs md:text-sm font-semibold transition"
           >
             Logout

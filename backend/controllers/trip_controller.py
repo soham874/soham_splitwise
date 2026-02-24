@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Request, HTTPException
 
 from backend.constants import SESSION_USER_ID
-from backend.services import trip_service
+from backend.dependencies import get_oauth_session
+from backend.services import trip_service, splitwise_service, expense_service
 
 router = APIRouter(tags=["trip"])
 
@@ -29,6 +30,18 @@ async def create_trip(request: Request):
     user_id = _get_user_id(request)
     data = await request.json()
     trip = trip_service.create_trip(user_id=user_id, **_parse_trip_data(data))
+
+    # Sync existing Splitwise expenses for this group into the local DB
+    group_id = str(data.get("groupId", ""))
+    if group_id:
+        try:
+            oauth = get_oauth_session(request)
+            sw_expenses = splitwise_service.fetch_expenses(oauth, group_id)
+            if sw_expenses:
+                expense_service.sync_expenses_from_splitwise(group_id, sw_expenses)
+        except Exception:
+            pass  # Non-critical: trip is still created even if sync fails
+
     return {"status": "success", "trip": trip}
 
 

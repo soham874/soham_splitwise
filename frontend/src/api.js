@@ -1,5 +1,5 @@
 const apiFetch = (url, options = {}) =>
-  fetch(url, { credentials: "include", ...options });
+  fetch(`/api${url}`, { credentials: "include", ...options });
 
 export async function checkLogin() {
   const res = await apiFetch("/check_login");
@@ -9,7 +9,7 @@ export async function checkLogin() {
 export async function fetchGroups() {
   const res = await apiFetch(`/get_groups?t=${Date.now()}`);
   if (res.status === 401) {
-    window.location.href = "/login";
+    window.location.href = "/api/login";
     return { groups: [] };
   }
   return res.json();

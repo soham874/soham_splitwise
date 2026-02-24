@@ -37,13 +37,13 @@ app.add_middleware(
 )
 
 # Register routers
-app.include_router(auth_controller.router)
-app.include_router(groups_controller.router)
-app.include_router(expenses_controller.router)
-app.include_router(currencies_controller.router)
-app.include_router(trip_controller.router)
+app.include_router(auth_controller.router, prefix="/api")
+app.include_router(groups_controller.router, prefix="/api")
+app.include_router(expenses_controller.router, prefix="/api")
+app.include_router(currencies_controller.router, prefix="/api")
+app.include_router(trip_controller.router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}

@@ -81,10 +81,10 @@ export default function App() {
           await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
           setPage(PAGES.MY_TRIPS);
         } else {
-          window.location.href = "/login";
+          window.location.href = "/api/login";
         }
       } catch {
-        window.location.href = "/login";
+        window.location.href = "/api/login";
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

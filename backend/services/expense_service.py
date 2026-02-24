@@ -85,6 +85,58 @@ def save_expense_rows(
         conn.close()
 
 
+def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> None:
+    """Bulk-insert Splitwise expenses into the local expenses table.
+
+    For each expense, one row is created per user who has owed_share > 0.
+    Amounts are converted to INR.  Location and category are left blank
+    because Splitwise doesn't carry those fields.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        for exp in sw_expenses:
+            expense_id = str(exp.get("id", ""))
+            description = exp.get("description", "")
+            currency_code = exp.get("currency_code", "INR")
+            rate = get_inr_rate(currency_code)
+            # Extract date from Splitwise (format: "2025-01-15T12:00:00Z")
+            raw_date = exp.get("date") or exp.get("created_at") or ""
+            date_str = raw_date[:10] if raw_date else None
+
+            users = exp.get("users", [])
+            for u in users:
+                owed = float(u.get("owed_share", 0))
+                if owed <= 0:
+                    continue
+                amount_inr = round(owed * rate, 2)
+                sw_user_id = u.get("user_id") or u.get("user", {}).get("id")
+                cursor.execute(
+                    """
+                    INSERT INTO expenses
+                        (trip_id, user_id, expense_id, location, category,
+                         description, amount_inr, currency_code, original_amount, date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        trip_id,
+                        sw_user_id,
+                        expense_id,
+                        "",
+                        "",
+                        description,
+                        amount_inr,
+                        currency_code,
+                        owed,
+                        date_str,
+                    ),
+                )
+        conn.commit()
+        cursor.close()
+    finally:
+        conn.close()
+
+
 def delete_expense_rows(expense_id: str) -> None:
     """Delete all rows for a given expense_id (Splitwise or local)."""
     conn = get_connection()
