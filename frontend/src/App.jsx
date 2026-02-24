@@ -78,8 +78,29 @@ export default function App() {
         const data = await checkLogin();
         if (data.logged_in) {
           if (data.user) setCurrentUser(data.user);
-          await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
-          setPage(PAGES.MY_TRIPS);
+          const [, groups, trips] = await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
+
+          // Auto-resume last opened trip
+          const lastTripId = localStorage.getItem("lastTripId");
+          if (lastTripId && trips.length > 0 && groups.length > 0) {
+            const trip = trips.find((t) => String(t.id) === lastTripId);
+            if (trip) {
+              setSelectedTrip(trip);
+              const gid = parseInt(trip.groupId);
+              const group = groups.find((g) => g.id === gid);
+              if (group) {
+                setActiveGroup(group);
+                setPage(PAGES.DASHBOARD);
+              } else {
+                setPage(PAGES.TRIP_DETAIL);
+              }
+            } else {
+              localStorage.removeItem("lastTripId");
+              setPage(PAGES.MY_TRIPS);
+            }
+          } else {
+            setPage(PAGES.MY_TRIPS);
+          }
         } else {
           window.location.href = "/api/login";
         }
@@ -107,6 +128,7 @@ export default function App() {
   const openTripDetail = (trip) => {
     setSelectedTrip(trip);
     setPage(PAGES.TRIP_DETAIL);
+    try { localStorage.setItem("lastTripId", String(trip.id)); } catch {}
   };
 
   const openDashboard = () => {
@@ -176,7 +198,7 @@ export default function App() {
           onViewAnalytics={() => setPage(PAGES.ANALYTICS)}
           onEditTrip={() => { setEditingTrip(selectedTrip); setPage(PAGES.TRIP_SETUP); }}
           onDeleteTrip={() => handleDeleteTrip(selectedTrip.id)}
-          onBack={() => setPage(PAGES.MY_TRIPS)}
+          onBack={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }}
           isOwner={currentUser && selectedTrip.created_by === currentUser.id}
         />
       )}
