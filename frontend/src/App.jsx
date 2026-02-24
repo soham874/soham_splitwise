@@ -177,6 +177,7 @@ export default function App() {
           onEditTrip={() => { setEditingTrip(selectedTrip); setPage(PAGES.TRIP_SETUP); }}
           onDeleteTrip={() => handleDeleteTrip(selectedTrip.id)}
           onBack={() => setPage(PAGES.MY_TRIPS)}
+          isOwner={currentUser && selectedTrip.created_by === currentUser.id}
         />
       )}
 

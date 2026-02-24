@@ -96,8 +96,11 @@ def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> None:
     try:
         cursor = conn.cursor()
         for exp in sw_expenses:
-            expense_id = str(exp.get("id", ""))
             description = exp.get("description", "")
+            # Skip debt settlements
+            if description.strip().lower() == "payment":
+                continue
+            expense_id = str(exp.get("id", ""))
             currency_code = exp.get("currency_code", "INR")
             rate = get_inr_rate(currency_code)
             # Extract date from Splitwise (format: "2025-01-15T12:00:00Z")

@@ -8,6 +8,7 @@ export default function TripDetailPage({
   onEditTrip,
   onDeleteTrip,
   onBack,
+  isOwner,
 }) {
   const trip = tripDetails;
   const group = allGroups.find(
@@ -86,20 +87,22 @@ export default function TripDetailPage({
         </button>
       </div>
 
-      <div className="flex gap-3">
-        <button
-          onClick={onEditTrip}
-          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition"
-        >
-          Edit Trip Details
-        </button>
-        <button
-          onClick={onDeleteTrip}
-          className="bg-red-50 border border-red-200 rounded-xl px-6 p-4 text-center text-sm font-semibold text-red-600 hover:bg-red-100 hover:border-red-300 transition"
-        >
-          Delete
-        </button>
-      </div>
+      {isOwner && (
+        <div className="flex gap-3">
+          <button
+            onClick={onEditTrip}
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition"
+          >
+            Edit Trip Details
+          </button>
+          <button
+            onClick={onDeleteTrip}
+            className="bg-red-50 border border-red-200 rounded-xl px-6 p-4 text-center text-sm font-semibold text-red-600 hover:bg-red-100 hover:border-red-300 transition"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

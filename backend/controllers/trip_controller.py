@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 
 from backend.constants import SESSION_USER_ID
 from backend.dependencies import get_oauth_session
-from backend.services import trip_service, splitwise_service, expense_service
+from backend.services import trip_service, splitwise_service, expense_service, user_service
 
 router = APIRouter(tags=["trip"])
 
@@ -27,15 +27,54 @@ def _parse_trip_data(data: dict) -> dict:
 
 @router.post("/create_trip")
 async def create_trip(request: Request):
-    user_id = _get_user_id(request)
+    logged_in_user_id = _get_user_id(request)
     data = await request.json()
-    trip = trip_service.create_trip(user_id=user_id, **_parse_trip_data(data))
+    trip_data = _parse_trip_data(data)
+    group_id = trip_data["group_id"]
 
-    # Sync existing Splitwise expenses for this group into the local DB
-    group_id = str(data.get("groupId", ""))
+    oauth = get_oauth_session(request)
+
+    # Upsert all group members into the users table and create trip rows
+    # for every member so each user sees this trip in their list.
+    member_db_ids = []
     if group_id:
         try:
-            oauth = get_oauth_session(request)
+            groups_resp = splitwise_service.fetch_groups(oauth)
+            groups = groups_resp.get("groups", [])
+            group = next(
+                (g for g in groups if str(g.get("id")) == group_id), None
+            )
+            if group:
+                for member in group.get("members", []):
+                    sw_id = member.get("id")
+                    first = member.get("first_name", "")
+                    last = member.get("last_name", "")
+                    email = member.get("email", "")
+                    db_user = user_service.upsert_user(
+                        splitwise_id=sw_id,
+                        name=f"{first} {last}".strip(),
+                        email=email,
+                    )
+                    member_db_ids.append(db_user["id"])
+        except Exception:
+            pass  # Fall back to logged-in user only
+
+    # Ensure the logged-in user is always included
+    if logged_in_user_id not in member_db_ids:
+        member_db_ids.append(logged_in_user_id)
+
+    # Create a trip row for each member, tagging the creator
+    trip = None
+    for db_id in member_db_ids:
+        created = trip_service.create_trip(
+            user_id=db_id, **trip_data, created_by=logged_in_user_id
+        )
+        if db_id == logged_in_user_id:
+            trip = created
+
+    # Sync existing Splitwise expenses (skip "Payment" settlements)
+    if group_id:
+        try:
             sw_expenses = splitwise_service.fetch_expenses(oauth, group_id)
             if sw_expenses:
                 expense_service.sync_expenses_from_splitwise(group_id, sw_expenses)
@@ -47,7 +86,10 @@ async def create_trip(request: Request):
 
 @router.post("/update_trip/{trip_id}")
 async def update_trip(request: Request, trip_id: int):
-    _get_user_id(request)
+    user_id = _get_user_id(request)
+    existing = trip_service.get_trip_by_id(trip_id)
+    if not existing or existing.get("created_by") != user_id:
+        raise HTTPException(status_code=403, detail="Only the trip creator can edit this trip")
     data = await request.json()
     trip = trip_service.update_trip(trip_id=trip_id, **_parse_trip_data(data))
     return {"status": "success", "trip": trip}
@@ -62,7 +104,10 @@ def get_trips(request: Request):
 
 @router.post("/delete_trip/{trip_id}")
 def delete_trip(request: Request, trip_id: int):
-    _get_user_id(request)
+    user_id = _get_user_id(request)
+    existing = trip_service.get_trip_by_id(trip_id)
+    if not existing or existing.get("created_by") != user_id:
+        raise HTTPException(status_code=403, detail="Only the trip creator can delete this trip")
     trip_service.delete_trip(trip_id)
     return {"status": "success"}
 

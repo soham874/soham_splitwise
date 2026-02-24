@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS trips (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     user_id         INT           NOT NULL,
+    created_by      INT           NULL,
     group_id        VARCHAR(64)   NOT NULL,
     name            VARCHAR(255)  NOT NULL DEFAULT '',
     start_date      DATE          NULL,

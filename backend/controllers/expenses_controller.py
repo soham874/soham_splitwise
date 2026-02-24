@@ -50,6 +50,7 @@ async def create_expense(request: Request):
     group_id = str(payload.get("group_id", ""))
     currency_code = payload.get("currency_code", "INR")
     description = payload.get("description", "")
+    original_expense_id = payload.get("id")  # present when editing
     expense_id = None
     sw_result = {}
 
@@ -63,8 +64,12 @@ async def create_expense(request: Request):
         elif sw_result.get("expense"):
             expense_id = str(sw_result["expense"].get("id", ""))
     else:
-        # Solo expense – generate a local-only ID
-        expense_id = f"local_{uuid.uuid4().hex[:12]}"
+        # Solo expense – reuse original ID if editing, otherwise generate new
+        expense_id = str(original_expense_id) if original_expense_id else f"local_{uuid.uuid4().hex[:12]}"
+
+    # If editing, remove old rows before re-inserting updated ones
+    if original_expense_id:
+        expense_service.delete_expense_rows(str(original_expense_id))
 
     # Save to local expenses table (one row per user who owes)
     expense_service.save_expense_rows(

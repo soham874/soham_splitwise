@@ -13,13 +13,15 @@ def _row_to_dict(row: dict) -> dict:
         "end": str(row["end_date"]) if row["end_date"] else "",
         "currencies": row["currencies"].split(",") if row["currencies"] else [],
         "locations": row["locations"].split(",") if row["locations"] else [],
+        "created_by": row.get("created_by"),
     }
 
 
 def create_trip(user_id: int, group_id: str, name: str,
                 start_date: Optional[str], end_date: Optional[str],
                 currencies: list[str],
-                locations: list[str] | None = None) -> dict:
+                locations: list[str] | None = None,
+                created_by: int | None = None) -> dict:
     """Insert a new trip for the given user and return it."""
     currencies_csv = ",".join(currencies) if currencies else ""
     locations_csv = ",".join(locations) if locations else ""
@@ -28,11 +30,12 @@ def create_trip(user_id: int, group_id: str, name: str,
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO trips (user_id, group_id, name, start_date, end_date, currencies, locations)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO trips (user_id, group_id, name, start_date, end_date, currencies, locations, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (user_id, group_id, name,
-             start_date or None, end_date or None, currencies_csv, locations_csv),
+             start_date or None, end_date or None, currencies_csv, locations_csv,
+             created_by or user_id),
         )
         trip_id = cursor.lastrowid
         conn.commit()
@@ -82,7 +85,7 @@ def get_trips(user_id: int) -> list[dict]:
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id, group_id, name, start_date, end_date, currencies, locations "
+            "SELECT id, group_id, name, start_date, end_date, currencies, locations, created_by "
             "FROM trips WHERE user_id = %s ORDER BY created_at DESC",
             (user_id,),
         )
@@ -119,7 +122,7 @@ def get_trip_by_id(trip_id: int) -> Optional[dict]:
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id, group_id, name, start_date, end_date, currencies, locations "
+            "SELECT id, group_id, name, start_date, end_date, currencies, locations, created_by "
             "FROM trips WHERE id = %s",
             (trip_id,),
         )
