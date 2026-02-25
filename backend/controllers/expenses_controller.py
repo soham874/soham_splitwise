@@ -128,3 +128,22 @@ async def update_expense_details(request: Request):
         category=data.get("category", ""),
     )
     return {"status": "success"}
+
+
+@router.get("/convert/{from_code}/{to_code}/{amount}")
+def convert_currency(from_code: str, to_code: str, amount: float):
+    """Convert an amount from one currency to another."""
+    rate = expense_service.get_conversion_rate(from_code.upper(), to_code.upper())
+    return {"rate": rate, "result": round(amount * rate, 2)}
+
+
+@router.post("/convert_batch")
+async def convert_batch(request: Request):
+    """Return conversion rates from a base currency to multiple targets."""
+    data = await request.json()
+    base = data.get("base", "INR").upper()
+    targets = [t.upper() for t in data.get("targets", [])]
+    rates = {}
+    for t in targets:
+        rates[t] = expense_service.get_conversion_rate(base, t)
+    return {"base": base, "rates": rates}

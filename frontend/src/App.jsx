@@ -9,6 +9,7 @@ import DashboardPage from "./components/DashboardPage";
 import AnalyticsPage from "./components/AnalyticsPage";
 import ConfirmDialog from "./components/ConfirmDialog";
 import LandingPage from "./components/LandingPage";
+import CurrencyConverterPage from "./components/CurrencyConverterPage";
 
 const PAGES = {
   LOADING: "loading",
@@ -18,6 +19,7 @@ const PAGES = {
   TRIP_DETAIL: "trip_detail",
   DASHBOARD: "dashboard",
   ANALYTICS: "analytics",
+  CURRENCY_CONVERTER: "currency_converter",
 };
 
 export default function App() {
@@ -199,6 +201,7 @@ export default function App() {
           allGroups={allGroups}
           onManageExpenses={openDashboard}
           onViewAnalytics={() => setPage(PAGES.ANALYTICS)}
+          onCurrencyConverter={() => setPage(PAGES.CURRENCY_CONVERTER)}
           onEditTrip={() => { setEditingTrip(selectedTrip); setPage(PAGES.TRIP_SETUP); }}
           onDeleteTrip={() => handleDeleteTrip(selectedTrip.id)}
           onBack={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }}
@@ -214,6 +217,13 @@ export default function App() {
           currentUser={currentUser}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
           onRefresh={refreshAndShowDashboard}
+        />
+      )}
+
+      {page === PAGES.CURRENCY_CONVERTER && selectedTrip && (
+        <CurrencyConverterPage
+          tripDetails={selectedTrip}
+          onBack={() => setPage(PAGES.TRIP_DETAIL)}
         />
       )}
 

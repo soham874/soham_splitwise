@@ -73,6 +73,20 @@ export async function fetchMyExpenses(groupId) {
   return res.json();
 }
 
+export async function convertCurrency(from, to, amount) {
+  const res = await apiFetch(`/convert/${from}/${to}/${amount}`);
+  return res.json();
+}
+
+export async function convertBatch(base, targets) {
+  const res = await apiFetch("/convert_batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base, targets }),
+  });
+  return res.json();
+}
+
 export async function updateExpenseDetails(id, location, category) {
   const res = await apiFetch("/update_expense_details", {
     method: "POST",

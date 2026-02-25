@@ -35,6 +35,30 @@ def get_inr_rate(currency_code: str) -> float:
     return rate
 
 
+def get_conversion_rate(from_code: str, to_code: str) -> float:
+    """Return the exchange rate from *from_code* to *to_code*.
+
+    Returns 1.0 if both codes are the same.
+    Uses a simple in-memory cache keyed by 'FROM->TO'.
+    """
+    if from_code == to_code:
+        return 1.0
+
+    cache_key = f"{from_code}->{to_code}"
+    if cache_key in _rate_cache:
+        return _rate_cache[cache_key]
+
+    try:
+        resp = requests.get(f"{EXCHANGE_RATE_API}/{from_code}/{to_code}", timeout=10)
+        data = resp.json()
+        rate = float(data.get("conversion_rate", 1.0))
+    except Exception:
+        rate = 1.0
+
+    _rate_cache[cache_key] = rate
+    return rate
+
+
 def save_expense_rows(
     trip_id: str,
     expense_id: Optional[str],
