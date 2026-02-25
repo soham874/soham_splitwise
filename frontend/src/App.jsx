@@ -8,9 +8,11 @@ import TripDetailPage from "./components/TripDetailPage";
 import DashboardPage from "./components/DashboardPage";
 import AnalyticsPage from "./components/AnalyticsPage";
 import ConfirmDialog from "./components/ConfirmDialog";
+import LandingPage from "./components/LandingPage";
 
 const PAGES = {
   LOADING: "loading",
+  LANDING: "landing",
   MY_TRIPS: "my_trips",
   TRIP_SETUP: "trip_setup",
   TRIP_DETAIL: "trip_detail",
@@ -102,10 +104,10 @@ export default function App() {
             setPage(PAGES.MY_TRIPS);
           }
         } else {
-          window.location.href = "/api/login";
+          setPage(PAGES.LANDING);
         }
       } catch {
-        window.location.href = "/api/login";
+        setPage(PAGES.LANDING);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -166,10 +168,11 @@ export default function App() {
   };
 
   if (page === PAGES.LOADING) return <LoadingOverlay />;
+  if (page === PAGES.LANDING) return <LandingPage />;
 
   return (
     <div>
-      <Navbar onHome={() => setPage(PAGES.MY_TRIPS)} />
+      <Navbar onHome={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }} />
 
       {page === PAGES.MY_TRIPS && (
         <MyTripsPage

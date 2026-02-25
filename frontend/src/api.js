@@ -9,7 +9,6 @@ export async function checkLogin() {
 export async function fetchGroups() {
   const res = await apiFetch(`/get_groups?t=${Date.now()}`);
   if (res.status === 401) {
-    window.location.href = "/api/login";
     return { groups: [] };
   }
   return res.json();
