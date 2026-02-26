@@ -33,11 +33,16 @@ export default function TripDetailPage({
       <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white p-8 rounded-3xl shadow-xl mb-8 relative overflow-hidden">
         <div className="relative z-10">
           <h2 className="text-3xl font-bold mb-1">{trip?.name || "Untitled Trip"}</h2>
-          <p className="text-emerald-200 text-sm font-medium mb-2">
+          <p className="text-emerald-200 text-sm font-medium mb-1">
             {trip?.start && trip?.end
               ? `${trip.start} — ${trip.end}`
               : "Dates not set"}
           </p>
+          {trip?.created_by_name && (
+            <p className="text-emerald-300 text-xs font-medium mb-2">
+              Created by {trip.created_by_name}
+            </p>
+          )}
           <div className="flex flex-wrap gap-3 mt-4">
             <span className="bg-emerald-800/60 text-emerald-100 text-xs font-semibold px-3 py-1.5 rounded-full">
               {memberCount} {memberCount === 1 ? "member" : "members"}

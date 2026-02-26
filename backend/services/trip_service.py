@@ -14,6 +14,7 @@ def _row_to_dict(row: dict) -> dict:
         "currencies": row["currencies"].split(",") if row["currencies"] else [],
         "locations": row["locations"].split(",") if row["locations"] else [],
         "created_by": row.get("created_by"),
+        "created_by_name": row.get("created_by_name", ""),
     }
 
 
@@ -85,8 +86,10 @@ def get_trips(user_id: int) -> list[dict]:
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id, group_id, name, start_date, end_date, currencies, locations, created_by "
-            "FROM trips WHERE user_id = %s ORDER BY created_at DESC",
+            "SELECT t.id, t.group_id, t.name, t.start_date, t.end_date, "
+            "t.currencies, t.locations, t.created_by, u.name AS created_by_name "
+            "FROM trips t LEFT JOIN users u ON t.created_by = u.id "
+            "WHERE t.user_id = %s ORDER BY t.created_at DESC",
             (user_id,),
         )
         rows = cursor.fetchall()
@@ -122,8 +125,10 @@ def get_trip_by_id(trip_id: int) -> Optional[dict]:
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id, group_id, name, start_date, end_date, currencies, locations, created_by "
-            "FROM trips WHERE id = %s",
+            "SELECT t.id, t.group_id, t.name, t.start_date, t.end_date, "
+            "t.currencies, t.locations, t.created_by, u.name AS created_by_name "
+            "FROM trips t LEFT JOIN users u ON t.created_by = u.id "
+            "WHERE t.id = %s",
             (trip_id,),
         )
         row = cursor.fetchone()
