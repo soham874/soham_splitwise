@@ -30,6 +30,7 @@ export default function ExpenseForm({
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState(currencies[0]?.currency_code || "INR");
   const [splitEqually, setSplitEqually] = useState(true);
+  const [personalExpense, setPersonalExpense] = useState(false);
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const skipRecalcRef = useRef(false);
@@ -108,65 +109,71 @@ export default function ExpenseForm({
       updated[index][field] = value;
 
       if (field === "paid") {
-        // Auto-balance paid across other members
-        const editedPaid = parseFloat(value || 0);
-        const otherCount = updated.length - 1;
-        if (otherCount > 0) {
-          const remainder = Math.max(0, total - editedPaid);
-          const each = (remainder / otherCount).toFixed(2);
-          let distributed = 0;
-          updated.forEach((s, i) => {
-            if (i !== index) {
-              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
-                s.paid = (remainder - distributed).toFixed(2);
-              } else {
-                s.paid = each;
-                distributed += parseFloat(each);
+        if (splitEqually) {
+          // Auto-balance paid across other members only when splitting equally
+          const editedPaid = parseFloat(value || 0);
+          const otherCount = updated.length - 1;
+          if (otherCount > 0) {
+            const remainder = Math.max(0, total - editedPaid);
+            const each = (remainder / otherCount).toFixed(2);
+            let distributed = 0;
+            updated.forEach((s, i) => {
+              if (i !== index) {
+                if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                  s.paid = (remainder - distributed).toFixed(2);
+                } else {
+                  s.paid = each;
+                  distributed += parseFloat(each);
+                }
               }
-            }
-          });
+            });
+          }
         }
       } else if (field === "percent" && total > 0) {
         updated[index].owedAmt = (total * (parseFloat(value || 0) / 100)).toFixed(2);
-        // Auto-balance owed across other members
-        const editedOwed = parseFloat(updated[index].owedAmt);
-        const otherCount = updated.length - 1;
-        if (otherCount > 0) {
-          const remainder = Math.max(0, total - editedOwed);
-          const each = (remainder / otherCount).toFixed(2);
-          let distributed = 0;
-          updated.forEach((s, i) => {
-            if (i !== index) {
-              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
-                s.owedAmt = (remainder - distributed).toFixed(2);
-              } else {
-                s.owedAmt = each;
-                distributed += parseFloat(each);
+        if (splitEqually) {
+          // Auto-balance owed across other members only when splitting equally
+          const editedOwed = parseFloat(updated[index].owedAmt);
+          const otherCount = updated.length - 1;
+          if (otherCount > 0) {
+            const remainder = Math.max(0, total - editedOwed);
+            const each = (remainder / otherCount).toFixed(2);
+            let distributed = 0;
+            updated.forEach((s, i) => {
+              if (i !== index) {
+                if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                  s.owedAmt = (remainder - distributed).toFixed(2);
+                } else {
+                  s.owedAmt = each;
+                  distributed += parseFloat(each);
+                }
+                s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
               }
-              s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
-            }
-          });
+            });
+          }
         }
       } else if (field === "owedAmt" && total > 0) {
         updated[index].percent = ((parseFloat(value || 0) / total) * 100).toFixed(1);
-        // Auto-balance owed across other members
-        const editedOwed = parseFloat(value || 0);
-        const otherCount = updated.length - 1;
-        if (otherCount > 0) {
-          const remainder = Math.max(0, total - editedOwed);
-          const each = (remainder / otherCount).toFixed(2);
-          let distributed = 0;
-          updated.forEach((s, i) => {
-            if (i !== index) {
-              if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
-                s.owedAmt = (remainder - distributed).toFixed(2);
-              } else {
-                s.owedAmt = each;
-                distributed += parseFloat(each);
+        if (splitEqually) {
+          // Auto-balance owed across other members only when splitting equally
+          const editedOwed = parseFloat(value || 0);
+          const otherCount = updated.length - 1;
+          if (otherCount > 0) {
+            const remainder = Math.max(0, total - editedOwed);
+            const each = (remainder / otherCount).toFixed(2);
+            let distributed = 0;
+            updated.forEach((s, i) => {
+              if (i !== index) {
+                if (i === updated.length - 1 || (i > index && distributed + parseFloat(each) > remainder)) {
+                  s.owedAmt = (remainder - distributed).toFixed(2);
+                } else {
+                  s.owedAmt = each;
+                  distributed += parseFloat(each);
+                }
+                s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
               }
-              s.percent = total > 0 ? ((parseFloat(s.owedAmt) / total) * 100).toFixed(1) : "0";
-            }
-          });
+            });
+          }
         }
       }
       return updated;
@@ -210,6 +217,7 @@ export default function ExpenseForm({
     setTotalCost("0.00");
     setNotes("");
     setSplitEqually(true);
+    setPersonalExpense(false);
     setCurrency(currencies[0]?.currency_code || "INR");
     setLocation("");
     setCategory("");
@@ -292,7 +300,10 @@ export default function ExpenseForm({
               type="checkbox"
               id="split_equally"
               checked={splitEqually}
-              onChange={(e) => setSplitEqually(e.target.checked)}
+              onChange={(e) => {
+                setSplitEqually(e.target.checked);
+                if (e.target.checked) setPersonalExpense(false);
+              }}
               className="w-4 h-4 rounded text-emerald-600"
             />
             <label
@@ -300,6 +311,41 @@ export default function ExpenseForm({
               className="ml-2 text-xs md:text-sm font-semibold text-emerald-800 cursor-pointer whitespace-nowrap"
             >
               Split Equally
+            </label>
+          </div>
+          <div className="flex items-center bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+            <input
+              type="checkbox"
+              id="personal_expense"
+              checked={personalExpense}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setPersonalExpense(checked);
+                if (checked) {
+                  setSplitEqually(false);
+                  skipRecalcRef.current = true;
+                  const total = parseFloat(totalCost || 0);
+                  setMemberSplits((prev) =>
+                    prev.map((s) => {
+                      const isCurrentUser =
+                        currentUser?.name &&
+                        s.name === currentUser.name.split(" ")[0];
+                      return {
+                        ...s,
+                        percent: isCurrentUser ? "100.0" : "0.0",
+                        owedAmt: isCurrentUser ? total.toFixed(2) : "0.00",
+                      };
+                    })
+                  );
+                }
+              }}
+              className="w-4 h-4 rounded text-blue-600"
+            />
+            <label
+              htmlFor="personal_expense"
+              className="ml-2 text-xs md:text-sm font-semibold text-blue-800 cursor-pointer whitespace-nowrap"
+            >
+              Personal Expense
             </label>
           </div>
           <select

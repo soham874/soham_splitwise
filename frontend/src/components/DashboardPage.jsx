@@ -98,7 +98,7 @@ export default function DashboardPage({
             currentExpenses={currentExpenses}
             onEdit={null}
             onDelete={handleDelete}
-            onRefresh={() => loadHistory()}
+            onRefresh={async () => { await onRefresh(activeGroup.id); await loadHistory(); }}
           />
         </div>
       </div>

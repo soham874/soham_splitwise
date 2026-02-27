@@ -101,18 +101,22 @@ def get_trips(user_id: int) -> list[dict]:
 
 
 def delete_trip(trip_id: int) -> None:
-    """Delete a trip and all related expense rows."""
+    """Delete a trip (and all sibling trip rows for the same group) and all related expense rows."""
     conn = get_connection()
     try:
         cursor = conn.cursor(dictionary=True)
-        # Look up the group_id so we can delete matching expenses
+        # Look up the group_id so we can delete matching expenses and all member trip rows
         cursor.execute("SELECT group_id FROM trips WHERE id = %s", (trip_id,))
         row = cursor.fetchone()
         if row:
+            group_id = row["group_id"]
             cursor.execute(
-                "DELETE FROM expenses WHERE trip_id = %s", (row["group_id"],)
+                "DELETE FROM expenses WHERE trip_id = %s", (group_id,)
             )
-            cursor.execute("DELETE FROM trips WHERE id = %s", (trip_id,))
+            # Delete trip rows for ALL members of this group, not just the creator's row
+            cursor.execute(
+                "DELETE FROM trips WHERE group_id = %s", (group_id,)
+            )
         conn.commit()
         cursor.close()
     finally:
