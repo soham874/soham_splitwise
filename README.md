@@ -171,6 +171,13 @@ Deployed on an **Oracle Cloud VM** (Ubuntu). Access with SSH auth:
 ssh ubuntu@140.245.31.106
 ```
 
+2 screens are created to access systems.
+
+```bash
+app # backend
+db # mysql
+```
+
 ---
 
 ## External Services
@@ -180,3 +187,4 @@ ssh ubuntu@140.245.31.106
 | [Splitwise API](https://dev.splitwise.com/)          | Expense sync & OAuth     |
 | [ExchangeRate API](https://www.exchangerate-api.com/)| Currency conversion      |
 | [DuckDNS](https://www.duckdns.org/)                  | Dynamic DNS for domain   |
+|[Health Check](https://hrpt5w0z.status.cron-job.org/)| Service status|
