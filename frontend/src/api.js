@@ -113,6 +113,15 @@ export async function convertBatch(base, targets) {
   return res.json();
 }
 
+export async function updateStayDates(id, startDate, endDate, location) {
+  const res = await apiFetch("/update_stay_dates", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, start_date: startDate, end_date: endDate, location }),
+  });
+  return res.json();
+}
+
 export async function updateExpenseDetails(id, location, category) {
   const res = await apiFetch("/update_expense_details", {
     method: "POST",

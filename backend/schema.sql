@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     currency_code   VARCHAR(10)   NOT NULL DEFAULT 'INR',
     original_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Owed amount in original currency',
     date            DATE          NULL,
+    start_date      DATE          NULL COMMENT 'Check-in date for stays',
+    end_date        DATE          NULL COMMENT 'Check-out date for stays',
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_trip_id (trip_id),

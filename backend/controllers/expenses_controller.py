@@ -142,6 +142,22 @@ async def update_expense_details(request: Request):
     return {"status": "success"}
 
 
+@router.post("/update_stay_dates")
+async def update_stay_dates(request: Request):
+    """Update check-in (date) and check-out (end_date) on a stay expense row."""
+    db_user_id = request.session.get(SESSION_USER_ID)
+    if not db_user_id:
+        return {"status": "error", "detail": "Not authenticated"}
+    data = await request.json()
+    expense_service.update_stay_dates(
+        expense_row_id=data["id"],
+        start_date=data.get("start_date", None),
+        end_date=data.get("end_date", None),
+        location=data.get("location", ""),
+    )
+    return {"status": "success"}
+
+
 @router.get("/get_personal_expenses/{group_id}")
 def get_personal_expenses(request: Request, group_id: str):
     """Return local-only personal expenses for a group, shaped like Splitwise expenses."""

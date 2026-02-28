@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchMyExpenses, updateExpenseDetails, syncExpenses } from "../api";
+import { fetchMyExpenses, updateExpenseDetails, updateStayDates, syncExpenses } from "../api";
 
 const EXPENSE_CATEGORIES = [
   "Important Documents",
@@ -17,10 +17,10 @@ const EXPENSE_CATEGORIES = [
   "Stays - Hostel"
 ];
 
+const STAY_CATEGORIES = ["Stays - Hotel", "Stays - Hostel"];
+
 const GRAPH_EXCLUDED_CATEGORIES = [
   "Transit - Flight",
-  "Stays - Hotel",
-  "Stays - Hostel",
 ];
 
 const PIE_COLORS = [
@@ -104,8 +104,41 @@ function BreakdownPanel({ title, icon, data, colorKey }) {
   );
 }
 
+/* ── Pure SVG Bar Chart ── */
+function BarChart({ data, color, unit }) {
+  if (!data || data.length === 0) return null;
+  const max = Math.max(...data.map((d) => d.value));
+  const barH = 22;
+  const gap = 4;
+  const labelW = 80;
+  const valueW = 70;
+  const chartW = 300;
+  const totalH = data.length * (barH + gap);
+
+  return (
+    <svg viewBox={`0 0 ${labelW + chartW + valueW} ${totalH}`} className="w-full" style={{ maxHeight: Math.max(totalH, 120) }}>
+      {data.map((d, i) => {
+        const y = i * (barH + gap);
+        const w = max > 0 ? (d.value / max) * chartW : 0;
+        return (
+          <g key={d.label}>
+            <text x={labelW - 4} y={y + barH / 2 + 4} textAnchor="end" className="text-[10px] fill-gray-500">
+              {d.label.length > 12 ? d.label.slice(5) : d.label}
+            </text>
+            <rect x={labelW} y={y} width={Math.max(w, 2)} height={barH} rx="3" fill={color} opacity="0.85" />
+            <text x={labelW + w + 4} y={y + barH / 2 + 4} className="text-[10px] fill-gray-700 font-mono font-bold">
+              {unit}{d.value.toFixed(0)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 const TABS = [
   { id: "update", label: "Update", icon: "M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+  { id: "stays", label: "Stays", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" },
   { id: "expenses", label: "Expenses", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" },
   { id: "breakdown", label: "Breakdown", icon: "M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" },
 ];
@@ -123,6 +156,7 @@ function StatCard({ label, value, sub }) {
 export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
   const [expenses, setExpenses] = useState([]);
   const [editState, setEditState] = useState({});
+  const [stayEditState, setStayEditState] = useState({});
   const [saving, setSaving] = useState({});
   const [activeTab, setActiveTab] = useState("update");
 
@@ -144,7 +178,17 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
     loadExpenses();
   }, [loadExpenses]);
 
-  const incomplete = expenses.filter(
+  const stayExpenses = useMemo(
+    () => expenses.filter((e) => STAY_CATEGORIES.includes(e.category)),
+    [expenses]
+  );
+
+  const nonStayExpenses = useMemo(
+    () => expenses.filter((e) => !STAY_CATEGORIES.includes(e.category)),
+    [expenses]
+  );
+
+  const incomplete = nonStayExpenses.filter(
     (e) => !e.location || !e.category
   );
   const allExpenses = expenses;
@@ -178,10 +222,77 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
     () => groupBy(graphExpenses, (e) => e.location),
     [graphExpenses, groupBy]
   );
-  const byDate = useMemo(
-    () => groupBy(graphExpenses, (e) => e.date),
-    [graphExpenses, groupBy]
-  );
+  const byDate = useMemo(() => {
+    const map = {};
+    graphExpenses.forEach((e) => {
+      const amt = e.amount_inr || 0;
+      if (STAY_CATEGORIES.includes(e.category) && e.start_date && e.end_date && e.start_date !== e.end_date) {
+        const start = new Date(e.start_date);
+        const end = new Date(e.end_date);
+        const nights = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+        const perNight = amt / nights;
+        for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+          const key = d.toISOString().slice(0, 10);
+          map[key] = (map[key] || 0) + perNight;
+        }
+      } else {
+        const key = e.date || "Not set";
+        map[key] = (map[key] || 0) + amt;
+      }
+    });
+    return Object.entries(map)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [graphExpenses]);
+
+  /* ── Stay per-night breakdown ── */
+  const stayPerNight = useMemo(() => {
+    const map = {};
+    stayExpenses.forEach((e) => {
+      const amt = e.amount_inr || 0;
+      if (e.start_date && e.end_date && e.start_date !== e.end_date) {
+        const start = new Date(e.start_date);
+        const end = new Date(e.end_date);
+        const nights = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+        const perNight = amt / nights;
+        for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+          const key = d.toISOString().slice(0, 10);
+          map[key] = (map[key] || 0) + perNight;
+        }
+      } else if (e.date) {
+        map[e.date] = (map[e.date] || 0) + amt;
+      }
+    });
+    return Object.entries(map)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [stayExpenses]);
+
+  const stayAvgPerNight = useMemo(() => {
+    if (stayPerNight.length === 0) return 0;
+    const total = stayPerNight.reduce((s, d) => s + d.value, 0);
+    return total / stayPerNight.length;
+  }, [stayPerNight]);
+
+  /* ── Food per-day breakdown ── */
+  const foodPerDay = useMemo(() => {
+    const map = {};
+    expenses
+      .filter((e) => e.category === "Food")
+      .forEach((e) => {
+        const key = e.date || "Not set";
+        map[key] = (map[key] || 0) + (e.amount_inr || 0);
+      });
+    return Object.entries(map)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [expenses]);
+
+  const foodAvgPerDay = useMemo(() => {
+    if (foodPerDay.length === 0) return 0;
+    const total = foodPerDay.reduce((s, d) => s + d.value, 0);
+    return total / foodPerDay.length;
+  }, [foodPerDay]);
 
   /* ── Detailed stats ── */
   const stats = useMemo(() => {
@@ -264,6 +375,11 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
             {tab.id === "update" && incomplete.length > 0 && (
               <span className="ml-1 text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
                 {incomplete.length}
+              </span>
+            )}
+            {tab.id === "stays" && stayExpenses.length > 0 && (
+              <span className="ml-1 text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                {stayExpenses.length}
               </span>
             )}
           </button>
@@ -353,6 +469,120 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Tab: Stays ── */}
+      {activeTab === "stays" && (
+        <section>
+          {stayExpenses.length === 0 ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
+              <p className="text-gray-500 text-sm">No stay expenses found. Categorise expenses as "Stays - Hotel" or "Stays - Hostel" first.</p>
+            </div>
+          ) : (
+            <div>
+              <div className="px-4 py-3 mb-4 bg-gray-50 border border-gray-200 rounded-xl">
+                <p className="text-xs text-gray-500">Set check-in and check-out dates for each stay. The cost will be spread across these dates in analytics.</p>
+              </div>
+              <div className="space-y-4">
+                {stayExpenses.map((exp) => {
+                  const edits = stayEditState[exp.id] || {};
+                  const locVal = edits.location ?? exp.location ?? "";
+                  const startVal = edits.start_date ?? exp.start_date ?? "";
+                  const endVal = edits.end_date ?? exp.end_date ?? "";
+                  const isSaving = saving[exp.id];
+                  const hasEdits = edits.start_date !== undefined || edits.end_date !== undefined || edits.location !== undefined;
+                  return (
+                    <div key={exp.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition">
+                      <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-800 text-sm truncate">{exp.description}</p>
+                          <span className="bg-blue-50 text-blue-700 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                            {exp.category}
+                          </span>
+                        </div>
+                        <p className="font-mono font-bold text-emerald-600 text-sm whitespace-nowrap">
+                          INR {exp.amount_inr?.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Location</label>
+                          <select
+                            value={locVal}
+                            onChange={(e) =>
+                              setStayEditState((prev) => ({
+                                ...prev,
+                                [exp.id]: { ...prev[exp.id], location: e.target.value },
+                              }))
+                            }
+                            className={`w-full border rounded-lg px-2.5 py-2 text-xs bg-white outline-none focus:border-blue-400 ${
+                              !locVal ? "border-amber-300 bg-amber-50" : "border-gray-200"
+                            }`}
+                          >
+                            <option value="">Select...</option>
+                            {tripLocations.map((l) => (
+                              <option key={l} value={l}>{l}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Check-in</label>
+                          <input
+                            type="date"
+                            value={startVal}
+                            onChange={(e) =>
+                              setStayEditState((prev) => ({
+                                ...prev,
+                                [exp.id]: { ...prev[exp.id], start_date: e.target.value },
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs bg-white outline-none focus:border-blue-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Check-out</label>
+                          <input
+                            type="date"
+                            value={endVal}
+                            onChange={(e) =>
+                              setStayEditState((prev) => ({
+                                ...prev,
+                                [exp.id]: { ...prev[exp.id], end_date: e.target.value },
+                              }))
+                            }
+                            className="w-full border border-gray-200 rounded-lg px-2.5 py-2 text-xs bg-white outline-none focus:border-blue-400"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          onClick={async () => {
+                            setSaving((prev) => ({ ...prev, [exp.id]: true }));
+                            try {
+                              await updateStayDates(exp.id, startVal, endVal, locVal);
+                              await loadExpenses();
+                              setStayEditState((prev) => {
+                                const next = { ...prev };
+                                delete next[exp.id];
+                                return next;
+                              });
+                            } finally {
+                              setSaving((prev) => ({ ...prev, [exp.id]: false }));
+                            }
+                          }}
+                          disabled={!hasEdits || isSaving}
+                          className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-40 disabled:bg-gray-300 transition"
+                        >
+                          {isSaving ? "..." : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -472,6 +702,45 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
               <p className="text-gray-500 text-sm">No expenses to break down.</p>
             </div>
           ) : (
+            <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Stay cost per night */}
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4" />
+                  </svg>
+                  Stay Cost Per Night
+                </h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Avg: <span className="font-mono font-bold text-gray-700">INR {stayAvgPerNight.toFixed(0)}</span> / night
+                </p>
+                {stayPerNight.length > 0 ? (
+                  <BarChart data={stayPerNight} color="#3b82f6" unit="" />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">No stay dates set yet.</p>
+                )}
+              </div>
+
+              {/* Food cost per day */}
+              <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2" />
+                  </svg>
+                  Food Cost Per Day
+                </h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Avg: <span className="font-mono font-bold text-gray-700">INR {foodAvgPerDay.toFixed(0)}</span> / day
+                </p>
+                {foodPerDay.length > 0 ? (
+                  <BarChart data={foodPerDay} color="#f97316" unit="" />
+                ) : (
+                  <p className="text-xs text-gray-400 italic">No food expenses found.</p>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <BreakdownPanel
                 title="By Category"
@@ -502,6 +771,7 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
                 data={byDate}
               />
             </div>
+            </>
           )}
         </section>
       )}

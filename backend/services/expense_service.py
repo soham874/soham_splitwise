@@ -248,7 +248,7 @@ def get_expenses_by_trip(trip_id: str) -> list[dict]:
             """
             SELECT id, trip_id, user_id, expense_id, location, category,
                    description, amount_inr, currency_code, original_amount,
-                   date, created_at, updated_at
+                   date, start_date, end_date, created_at, updated_at
             FROM expenses
             WHERE trip_id = %s
             ORDER BY date DESC, created_at DESC
@@ -268,6 +268,10 @@ def get_expenses_by_trip(trip_id: str) -> list[dict]:
             row["original_amount"] = float(row["original_amount"])
         if row.get("date"):
             row["date"] = str(row["date"])
+        if row.get("start_date"):
+            row["start_date"] = str(row["start_date"])
+        if row.get("end_date"):
+            row["end_date"] = str(row["end_date"])
         if row.get("created_at"):
             row["created_at"] = str(row["created_at"])
         if row.get("updated_at"):
@@ -285,7 +289,7 @@ def get_user_expenses_by_trip(trip_id: str, splitwise_user_id: int) -> list[dict
             """
             SELECT id, trip_id, user_id, expense_id, location, category,
                    description, amount_inr, currency_code, original_amount,
-                   date, created_at, updated_at
+                   date, start_date, end_date, created_at, updated_at
             FROM expenses
             WHERE trip_id = %s AND user_id = %s
             ORDER BY date DESC, created_at DESC
@@ -304,6 +308,10 @@ def get_user_expenses_by_trip(trip_id: str, splitwise_user_id: int) -> list[dict
             row["original_amount"] = float(row["original_amount"])
         if row.get("date"):
             row["date"] = str(row["date"])
+        if row.get("start_date"):
+            row["start_date"] = str(row["start_date"])
+        if row.get("end_date"):
+            row["end_date"] = str(row["end_date"])
         if row.get("created_at"):
             row["created_at"] = str(row["created_at"])
         if row.get("updated_at"):
@@ -388,6 +396,26 @@ def update_expense_details(expense_row_id: int, location: str, category: str) ->
         cursor.execute(
             "UPDATE expenses SET location = %s, category = %s WHERE id = %s",
             (location, category, expense_row_id),
+        )
+        conn.commit()
+        cursor.close()
+    finally:
+        conn.close()
+
+
+def update_stay_dates(
+    expense_row_id: int,
+    start_date: Optional[str],
+    end_date: Optional[str],
+    location: Optional[str] = None,
+) -> None:
+    """Update the date (check-in), end_date (check-out) and location on a stay expense row."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE expenses SET start_date = %s, end_date = %s, location = %s WHERE id = %s",
+            (start_date or None, end_date or None, location or "", expense_row_id),
         )
         conn.commit()
         cursor.close()
