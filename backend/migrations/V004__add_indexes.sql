@@ -1,10 +1,4 @@
 -- V004: Add indexes for common query patterns
---
--- 1. users.splitwise_id  – explicit ASC index (UNIQUE already exists; this is a no-op
---    reminder; the unique key already serves as an index, so we skip re-creating it).
--- 2. trips.group_id      – used in delete_trip, expense sync lookups.
--- 3. expenses.user_id    – used in get_user_expenses_by_trip.
--- 4. expenses(trip_id, user_id) – composite for per-user-per-trip queries.
 
 USE `splitwise_manager`;
 
