@@ -189,7 +189,7 @@ export default function ExpenseForm({
     0
   );
   const total = parseFloat(totalCost || 0);
-  const isDisabled = Math.abs(sumPaid - total) > 0.05 || total <= 0;
+  const isDisabled = total <= 0 || (!personalExpense && Math.abs(sumPaid - total) > 0.05);
 
   const handleSubmit = async () => {
     const payload = {
@@ -332,6 +332,7 @@ export default function ExpenseForm({
                         s.name === currentUser.name.split(" ")[0];
                       return {
                         ...s,
+                        paid: isCurrentUser ? total.toFixed(2) : "0.00",
                         percent: isCurrentUser ? "100.0" : "0.0",
                         owedAmt: isCurrentUser ? total.toFixed(2) : "0.00",
                       };

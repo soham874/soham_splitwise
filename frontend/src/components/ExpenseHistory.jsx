@@ -44,11 +44,16 @@ export default function ExpenseHistory({
                   (u) => parseFloat(u.owed_share) > 0
                 );
                 const isSettlement = e.description?.trim().toLowerCase() === "payment";
+                const isPersonal = !!e.personal;
                 return (
                   <tr
                     key={e.id}
                     className={`border-b border-gray-50 text-[13px] align-top ${
-                      isSettlement ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-gray-50"
+                      isSettlement
+                        ? "bg-amber-50/60 hover:bg-amber-50"
+                        : isPersonal
+                        ? "bg-indigo-50/60 hover:bg-indigo-50"
+                        : "hover:bg-gray-50"
                     }`}
                   >
                     <td className="p-4">
@@ -66,8 +71,15 @@ export default function ExpenseHistory({
                           </span>
                         </div>
                       ) : (
-                        <div className="font-bold text-gray-800 mb-1">
-                          {e.description}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-gray-800">
+                            {e.description}
+                          </span>
+                          {isPersonal && (
+                            <span className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                              Personal
+                            </span>
+                          )}
                         </div>
                       )}
                       {e.details && (
@@ -112,7 +124,7 @@ export default function ExpenseHistory({
                       )}
                     </td>
                     <td className={`p-4 text-right font-mono font-bold ${
-                      isSettlement ? "text-amber-600" : "text-emerald-600"
+                      isSettlement ? "text-amber-600" : isPersonal ? "text-indigo-600" : "text-emerald-600"
                     }`}>
                       {e.currency_code} {e.cost}
                     </td>
@@ -152,12 +164,15 @@ export default function ExpenseHistory({
             (u) => parseFloat(u.owed_share) > 0
           );
           const isSettlement = e.description?.trim().toLowerCase() === "payment";
+          const isPersonal = !!e.personal;
           return (
             <div
               key={e.id}
               className={`p-4 rounded-xl border shadow-sm space-y-3 ${
                 isSettlement
                   ? "bg-amber-50 border-amber-200"
+                  : isPersonal
+                  ? "bg-indigo-50 border-indigo-200"
                   : "bg-white border-gray-200"
               }`}
             >
@@ -174,16 +189,25 @@ export default function ExpenseHistory({
                       </h4>
                     </>
                   ) : (
-                    <h4 className="font-bold text-gray-900 text-sm">
-                      {e.description}
-                    </h4>
+                    <>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-gray-900 text-sm">
+                          {e.description}
+                        </h4>
+                        {isPersonal && (
+                          <span className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
+                            Personal
+                          </span>
+                        )}
+                      </div>
+                    </>
                   )}
                   <p className="text-[10px] text-gray-400 uppercase tracking-tighter">
                     {new Date(e.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <p className={`font-mono font-bold text-sm ${
-                  isSettlement ? "text-amber-600" : "text-emerald-600"
+                  isSettlement ? "text-amber-600" : isPersonal ? "text-indigo-600" : "text-emerald-600"
                 }`}>
                   {e.currency_code} {e.cost}
                 </p>

@@ -142,6 +142,31 @@ async def update_expense_details(request: Request):
     return {"status": "success"}
 
 
+@router.get("/get_personal_expenses/{group_id}")
+def get_personal_expenses(request: Request, group_id: str):
+    """Return local-only personal expenses for a group, shaped like Splitwise expenses."""
+    db_user_id = request.session.get(SESSION_USER_ID)
+    if not db_user_id:
+        return {"expenses": []}
+    db_user = user_service.get_user_by_id(db_user_id)
+    if not db_user:
+        return {"expenses": []}
+    logger.info("Fetching personal expenses for group_id=%s user=%s", group_id, db_user["splitwise_id"])
+    expenses = expense_service.get_personal_expenses(group_id, db_user["splitwise_id"])
+    return {"expenses": expenses}
+
+
+@router.post("/sync_expenses/{group_id}")
+def sync_expenses(request: Request, group_id: str):
+    """Fetch expenses from Splitwise and sync any new ones into the local DB."""
+    logger.info("Syncing expenses from Splitwise for group_id=%s", group_id)
+    oauth = get_oauth_session(request)
+    sw_expenses = splitwise_service.fetch_expenses(oauth, group_id)
+    inserted = expense_service.sync_expenses_from_splitwise(group_id, sw_expenses)
+    logger.info("Sync complete for group_id=%s: %d new rows inserted", group_id, inserted)
+    return {"status": "success", "synced": inserted}
+
+
 @router.get("/convert/{from_code}/{to_code}/{amount}")
 def convert_currency(from_code: str, to_code: str, amount: float):
     """Convert an amount from one currency to another."""

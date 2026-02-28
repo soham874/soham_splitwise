@@ -117,61 +117,112 @@ def save_expense_rows(
         conn.close()
 
 
-def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> None:
-    """Bulk-insert Splitwise expenses into the local expenses table.
+def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> int:
+    """Sync Splitwise expenses into the local expenses table.
 
+    Uses exactly 3 DB round-trips:
+      1. SELECT all existing rows for this trip
+      2. Batch INSERT ... ON DUPLICATE KEY UPDATE for all active Splitwise rows
+      3. Batch DELETE for stale expense_ids no longer on Splitwise
 
-    For each expense, one row is created per user who has owed_share > 0.
-    Amounts are converted to INR.  Location and category are left blank
-    because Splitwise doesn't carry those fields.
+    User-set location and category are preserved on update.
+    Returns the number of newly inserted rows.
     """
-    logger.info("sync_expenses_from_splitwise: trip_id=%s count=%d", trip_id, len(sw_expenses))
+    logger.info("sync_expenses_from_splitwise: trip_id=%s incoming=%d", trip_id, len(sw_expenses))
+
+    # ── Build the desired state from Splitwise (pure Python, no DB) ──
+    active_sw_ids: set[str] = set()
+    upsert_rows: list[tuple] = []
+    for exp in sw_expenses:
+        description = exp.get("description", "")
+        if description.strip().lower() == "payment":
+            continue
+        expense_id = str(exp.get("id", ""))
+        active_sw_ids.add(expense_id)
+        currency_code = exp.get("currency_code", "INR")
+        rate = get_inr_rate(currency_code)
+        raw_date = exp.get("date") or exp.get("created_at") or ""
+        date_str = raw_date[:10] if raw_date else None
+
+        for u in exp.get("users", []):
+            owed = float(u.get("owed_share", 0))
+            if owed <= 0:
+                continue
+            sw_user_id = u.get("user_id") or u.get("user", {}).get("id")
+            amount_inr = round(owed * rate, 2)
+            upsert_rows.append((
+                trip_id, sw_user_id, expense_id, "", "",
+                description, amount_inr, currency_code, owed, date_str,
+            ))
+
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        for exp in sw_expenses:
-            description = exp.get("description", "")
-            # Skip debt settlements
-            if description.strip().lower() == "payment":
-                continue
-            expense_id = str(exp.get("id", ""))
-            currency_code = exp.get("currency_code", "INR")
-            rate = get_inr_rate(currency_code)
-            # Extract date from Splitwise (format: "2025-01-15T12:00:00Z")
-            raw_date = exp.get("date") or exp.get("created_at") or ""
-            date_str = raw_date[:10] if raw_date else None
 
-            users = exp.get("users", [])
-            for u in users:
-                owed = float(u.get("owed_share", 0))
-                if owed <= 0:
-                    continue
-                amount_inr = round(owed * rate, 2)
-                sw_user_id = u.get("user_id") or u.get("user", {}).get("id")
-                cursor.execute(
-                    """
-                    INSERT INTO expenses
-                        (trip_id, user_id, expense_id, location, category,
-                         description, amount_inr, currency_code, original_amount, date)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        trip_id,
-                        sw_user_id,
-                        expense_id,
-                        "",
-                        "",
-                        description,
-                        amount_inr,
-                        currency_code,
-                        owed,
-                        date_str,
-                    ),
-                )
+        # ── DB call 1: Read all existing (expense_id, user_id) for this trip ──
+        cursor.execute(
+            "SELECT expense_id, user_id FROM expenses WHERE trip_id = %s AND expense_id != ''",
+            (trip_id,),
+        )
+        existing_pairs = {(str(row[0]), str(row[1])) for row in cursor.fetchall()}
+        existing_eids = {pair[0] for pair in existing_pairs}
+
+        # Split into new inserts vs updates (Python-side, no extra DB calls)
+        insert_rows = []
+        update_rows = []
+        for row in upsert_rows:
+            # row = (trip_id, user_id, expense_id, loc, cat, desc, amt, cur, orig, date)
+            eid, uid = str(row[2]), str(row[1])
+            if (eid, uid) in existing_pairs:
+                # (desc, amount_inr, currency_code, original_amount, date, trip_id, expense_id, user_id)
+                update_rows.append((row[5], row[6], row[7], row[8], row[9], row[0], row[2], row[1]))
+            else:
+                insert_rows.append(row)
+
+        # ── DB call 2a: Batch insert new rows ──
+        if insert_rows:
+            cursor.executemany(
+                """
+                INSERT INTO expenses
+                    (trip_id, user_id, expense_id, location, category,
+                     description, amount_inr, currency_code, original_amount, date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                insert_rows,
+            )
+        inserted = len(insert_rows)
+
+        # ── DB call 2b: Batch update existing rows ──
+        if update_rows:
+            cursor.executemany(
+                """
+                UPDATE expenses
+                SET description = %s, amount_inr = %s, currency_code = %s,
+                    original_amount = %s, date = %s
+                WHERE trip_id = %s AND expense_id = %s AND user_id = %s
+                """,
+                update_rows,
+            )
+        updated = len(update_rows)
+
+        # ── DB call 3: Batch delete stale expense_ids ──
+        stale_ids = [eid for eid in existing_eids
+                     if not eid.startswith("local_") and eid not in active_sw_ids]
+        deleted = 0
+        if stale_ids:
+            placeholders = ",".join(["%s"] * len(stale_ids))
+            cursor.execute(
+                f"DELETE FROM expenses WHERE trip_id = %s AND expense_id IN ({placeholders})",
+                [trip_id] + stale_ids,
+            )
+            deleted = cursor.rowcount
+
         conn.commit()
         cursor.close()
+        logger.info("sync_expenses_from_splitwise: trip_id=%s inserted=%d updated=%d deleted=%d", trip_id, inserted, updated, deleted)
     finally:
         conn.close()
+    return inserted
 
 
 def delete_expense_rows(expense_id: str) -> None:
@@ -259,6 +310,74 @@ def get_user_expenses_by_trip(trip_id: str, splitwise_user_id: int) -> list[dict
             row["updated_at"] = str(row["updated_at"])
 
     return rows
+
+
+def get_personal_expenses(trip_id: str, splitwise_user_id: int) -> list[dict]:
+    """Return local-only personal expenses for a trip, shaped like Splitwise expenses
+    so the frontend ExpenseHistory can render them directly."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT expense_id, description, currency_code, original_amount,
+                   user_id, date, created_at, location, category
+            FROM expenses
+            WHERE trip_id = %s AND expense_id LIKE 'local_%%'
+            ORDER BY date DESC, created_at DESC
+            """,
+            (trip_id,),
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+    finally:
+        conn.close()
+
+    logger.info("get_personal_expenses: trip_id=%s found %d rows", trip_id, len(rows))
+
+    # Normalise types coming from MySQL
+    for row in rows:
+        if isinstance(row.get("original_amount"), Decimal):
+            row["original_amount"] = float(row["original_amount"])
+        if row.get("date"):
+            row["date"] = str(row["date"])
+        if row.get("created_at"):
+            row["created_at"] = str(row["created_at"])
+
+    # Group rows by expense_id (personal expenses typically have 1 row)
+    grouped: dict[str, list] = {}
+    for row in rows:
+        eid = row["expense_id"]
+        grouped.setdefault(eid, []).append(row)
+
+    expenses = []
+    for eid, group_rows in grouped.items():
+        first = group_rows[0]
+        total = sum(float(r.get("original_amount", 0)) for r in group_rows)
+        users = []
+        for r in group_rows:
+            amt = float(r.get("original_amount", 0))
+            users.append({
+                "user_id": r["user_id"],
+                "user": {"first_name": "You", "id": r["user_id"]},
+                "paid_share": f"{amt:.2f}",
+                "owed_share": f"{amt:.2f}",
+            })
+        expenses.append({
+            "id": eid,
+            "description": first.get("description", ""),
+            "cost": f"{total:.2f}",
+            "currency_code": first.get("currency_code", "INR"),
+            "created_at": str(first.get("created_at", "")),
+            "date": str(first.get("date", "")) if first.get("date") else None,
+            "details": "",
+            "users": users,
+            "personal": True,
+            "location": first.get("location", ""),
+            "category": first.get("category", ""),
+        })
+
+    return expenses
 
 
 def update_expense_details(expense_row_id: int, location: str, category: str) -> None:

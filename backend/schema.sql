@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     trip_id         VARCHAR(64)   NOT NULL COMMENT 'Splitwise group_id',
     user_id         BIGINT        NOT NULL COMMENT 'Splitwise user_id',
-    expense_id      VARCHAR(64)   NULL     COMMENT 'Splitwise expense_id, NULL if solo',
+    expense_id      VARCHAR(64)   NOT NULL DEFAULT '' COMMENT 'Splitwise expense_id or empty if solo',
     location        VARCHAR(255)  NOT NULL DEFAULT '',
     category        VARCHAR(255)  NOT NULL DEFAULT '',
     description     VARCHAR(512)  NOT NULL DEFAULT '',
@@ -51,5 +51,6 @@ CREATE TABLE IF NOT EXISTS expenses (
     INDEX idx_trip_id (trip_id),
     INDEX idx_expense_id (expense_id),
     INDEX idx_expenses_user_id (user_id),
-    INDEX idx_expenses_trip_user (trip_id, user_id)
+    INDEX idx_expenses_trip_user (trip_id, user_id),
+    UNIQUE KEY uq_trip_expense_user (trip_id, expense_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { fetchExpenses, createExpense, deleteExpenseApi } from "../api";
+import { fetchExpenses, createExpense, deleteExpenseApi, syncExpenses, fetchPersonalExpenses } from "../api";
 import ExpenseForm from "./ExpenseForm";
 import BalancesPanel from "./BalancesPanel";
 import ExpenseHistory from "./ExpenseHistory";
@@ -15,12 +15,17 @@ export default function DashboardPage({
   const [currentExpenses, setCurrentExpenses] = useState([]);
 
   const loadHistory = useCallback(async () => {
-    try {
-      const data = await fetchExpenses(activeGroup.id);
-      setCurrentExpenses(data.expenses || []);
-    } catch {
-      /* ignore */
-    }
+    await syncExpenses(activeGroup.id).catch(() => {});
+    const [swData, personalData] = await Promise.all([
+      fetchExpenses(activeGroup.id).catch(() => ({ expenses: [] })),
+      fetchPersonalExpenses(activeGroup.id).catch(() => ({ expenses: [] })),
+    ]);
+    const swExpenses = (swData.expenses || []).map((e) => ({ ...e, personal: false }));
+    const personalExpenses = (personalData.expenses || []).map((e) => ({ ...e, personal: true }));
+    const all = [...swExpenses, ...personalExpenses].sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    setCurrentExpenses(all);
   }, [activeGroup.id]);
 
   useEffect(() => {

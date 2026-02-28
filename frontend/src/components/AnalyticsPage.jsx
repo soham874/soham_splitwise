@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchMyExpenses, updateExpenseDetails } from "../api";
+import { fetchMyExpenses, updateExpenseDetails, syncExpenses } from "../api";
 
 const EXPENSE_CATEGORIES = [
   "Important Documents",
@@ -17,10 +17,16 @@ const EXPENSE_CATEGORIES = [
   "Stays - Hostel"
 ];
 
+const GRAPH_EXCLUDED_CATEGORIES = [
+  "Transit - Flight",
+  "Stays - Hotel",
+  "Stays - Hostel",
+];
+
 const PIE_COLORS = [
   "#059669", "#0284c7", "#d97706", "#dc2626", "#7c3aed",
   "#db2777", "#0d9488", "#ca8a04", "#4f46e5", "#ea580c",
-  "#16a34a", "#2563eb",
+  "#16a34a", "#2563eb", "#263960"
 ];
 
 /* ── Pure SVG Pie Chart ── */
@@ -126,6 +132,7 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
   const loadExpenses = useCallback(async () => {
     if (!groupId) return;
     try {
+      await syncExpenses(groupId).catch(() => {});
       const data = await fetchMyExpenses(groupId);
       setExpenses(data.expenses || []);
     } catch {
@@ -163,13 +170,17 @@ export default function AnalyticsPage({ tripDetails, currentUser, onBack }) {
     () => groupBy(allExpenses, (e) => e.category),
     [allExpenses, groupBy]
   );
+  const graphExpenses = useMemo(
+    () => allExpenses.filter((e) => !GRAPH_EXCLUDED_CATEGORIES.includes(e.category)),
+    [allExpenses]
+  );
   const byLocation = useMemo(
-    () => groupBy(allExpenses, (e) => e.location),
-    [allExpenses, groupBy]
+    () => groupBy(graphExpenses, (e) => e.location),
+    [graphExpenses, groupBy]
   );
   const byDate = useMemo(
-    () => groupBy(allExpenses, (e) => e.date),
-    [allExpenses, groupBy]
+    () => groupBy(graphExpenses, (e) => e.date),
+    [graphExpenses, groupBy]
   );
 
   /* ── Detailed stats ── */

@@ -89,6 +89,16 @@ export async function fetchMyExpenses(groupId) {
   return res.json();
 }
 
+export async function fetchPersonalExpenses(groupId) {
+  const res = await apiFetch(`/get_personal_expenses/${groupId}?t=${Date.now()}`);
+  return res.json();
+}
+
+export async function syncExpenses(groupId) {
+  const res = await apiFetch(`/sync_expenses/${groupId}`, { method: "POST" });
+  return res.json();
+}
+
 export async function convertCurrency(from, to, amount) {
   const res = await apiFetch(`/convert/${from}/${to}/${amount}`);
   return res.json();
