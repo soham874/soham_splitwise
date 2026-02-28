@@ -1,5 +1,21 @@
-const apiFetch = (url, options = {}) =>
-  fetch(`/api${url}`, { credentials: "include", ...options });
+const generateRequestId = () =>
+  `fe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const apiFetch = (url, options = {}) => {
+  const requestId = generateRequestId();
+  const headers = { ...(options.headers || {}), "X-Request-ID": requestId };
+  console.log(`[API] ${options.method || "GET"} /api${url}  rid=${requestId}`);
+  return fetch(`/api${url}`, { credentials: "include", ...options, headers }).then(
+    (res) => {
+      console.log(`[API] ${options.method || "GET"} /api${url}  rid=${requestId}  status=${res.status}`);
+      return res;
+    },
+    (err) => {
+      console.error(`[API] ${options.method || "GET"} /api${url}  rid=${requestId}  ERROR:`, err);
+      throw err;
+    }
+  );
+};
 
 export async function checkLogin() {
   const res = await apiFetch("/check_login");

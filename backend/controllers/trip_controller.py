@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Request, HTTPException
 
 from backend.constants import SESSION_USER_ID
 from backend.dependencies import get_oauth_session
 from backend.services import trip_service, splitwise_service, expense_service, user_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["trip"])
 
@@ -31,6 +35,7 @@ async def create_trip(request: Request):
     data = await request.json()
     trip_data = _parse_trip_data(data)
     group_id = trip_data["group_id"]
+    logger.info("Creating trip: name=%s group_id=%s user=%s", trip_data["name"], group_id, logged_in_user_id)
 
     oauth = get_oauth_session(request)
 
@@ -81,6 +86,7 @@ async def create_trip(request: Request):
         except Exception:
             pass  # Non-critical: trip is still created even if sync fails
 
+    logger.info("Trip created: id=%s name=%s members=%d", trip["id"] if trip else "-", trip_data["name"], len(member_db_ids))
     return {"status": "success", "trip": trip}
 
 
@@ -89,9 +95,11 @@ async def update_trip(request: Request, trip_id: int):
     user_id = _get_user_id(request)
     existing = trip_service.get_trip_by_id(trip_id)
     if not existing or existing.get("created_by") != user_id:
+        logger.warning("Unauthorized trip update attempt: trip_id=%s user=%s", trip_id, user_id)
         raise HTTPException(status_code=403, detail="Only the trip creator can edit this trip")
     data = await request.json()
     trip = trip_service.update_trip(trip_id=trip_id, **_parse_trip_data(data))
+    logger.info("Trip updated: id=%s user=%s", trip_id, user_id)
     return {"status": "success", "trip": trip}
 
 
@@ -99,6 +107,7 @@ async def update_trip(request: Request, trip_id: int):
 def get_trips(request: Request):
     user_id = _get_user_id(request)
     trips = trip_service.get_trips(user_id)
+    logger.info("Fetched %d trips for user=%s", len(trips), user_id)
     return {"trips": trips}
 
 
@@ -107,8 +116,10 @@ def delete_trip(request: Request, trip_id: int):
     user_id = _get_user_id(request)
     existing = trip_service.get_trip_by_id(trip_id)
     if not existing or existing.get("created_by") != user_id:
+        logger.warning("Unauthorized trip delete attempt: trip_id=%s user=%s", trip_id, user_id)
         raise HTTPException(status_code=403, detail="Only the trip creator can delete this trip")
     trip_service.delete_trip(trip_id)
+    logger.info("Trip deleted: id=%s group_id=%s user=%s", trip_id, existing.get("groupId"), user_id)
     return {"status": "success"}
 
 

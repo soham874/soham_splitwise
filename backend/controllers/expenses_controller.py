@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import date
 
@@ -7,13 +8,17 @@ from backend.constants import SESSION_USER_ID
 from backend.dependencies import get_oauth_session
 from backend.services import splitwise_service, expense_service, user_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["expenses"])
 
 
 @router.get("/get_expenses/{group_id}")
 def get_expenses(request: Request, group_id: str):
+    logger.info("Fetching expenses for group_id=%s", group_id)
     oauth = get_oauth_session(request)
     active_expenses = splitwise_service.fetch_expenses(oauth, group_id)
+    logger.info("Fetched %d active expenses for group_id=%s", len(active_expenses), group_id)
     return {"expenses": active_expenses}
 
 
@@ -21,6 +26,7 @@ def get_expenses(request: Request, group_id: str):
 async def create_expense(request: Request):
     oauth = get_oauth_session(request)
     payload = await request.json()
+    logger.info("Creating expense: description=%s group_id=%s", payload.get("description"), payload.get("group_id"))
 
     # Extract location & category (not sent to Splitwise)
     location = payload.pop("location", "")
@@ -56,6 +62,7 @@ async def create_expense(request: Request):
 
     if others_owe:
         # Other users have a share → save to Splitwise
+        logger.info("Expense involves others; saving to Splitwise (edit=%s)", bool(original_expense_id))
         sw_result = splitwise_service.create_or_update_expense(oauth, payload)
         # Extract the Splitwise expense ID from the response
         expenses_list = sw_result.get("expenses", [])
@@ -66,6 +73,7 @@ async def create_expense(request: Request):
     else:
         # Solo expense – reuse original ID if editing, otherwise generate new
         expense_id = str(original_expense_id) if original_expense_id else f"local_{uuid.uuid4().hex[:12]}"
+        logger.info("Solo expense; local expense_id=%s", expense_id)
 
     # If editing, remove old rows before re-inserting updated ones
     if original_expense_id:
@@ -83,6 +91,7 @@ async def create_expense(request: Request):
         date_str=str(date.today()),
     )
 
+    logger.info("Expense saved: expense_id=%s description=%s currency=%s", expense_id, description, currency_code)
     if others_owe:
         return sw_result
     else:
@@ -91,14 +100,17 @@ async def create_expense(request: Request):
 
 @router.post("/delete_expense/{expense_id}")
 def delete_expense(request: Request, expense_id: str):
+    logger.info("Deleting expense: expense_id=%s", expense_id)
     # Always remove from local DB
     expense_service.delete_expense_rows(expense_id)
 
     # If it's a Splitwise expense (not local-only), delete from Splitwise too
     if not expense_id.startswith("local_"):
+        logger.info("Also deleting from Splitwise: expense_id=%s", expense_id)
         oauth = get_oauth_session(request)
         return splitwise_service.delete_expense(oauth, expense_id)
 
+    logger.info("Local-only expense deleted: expense_id=%s", expense_id)
     return {"success": True}
 
 

@@ -1,6 +1,9 @@
+import logging
 from typing import Optional
 
 from backend.db import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 def upsert_user(splitwise_id: int, name: str, email: str) -> dict:
@@ -26,7 +29,9 @@ def upsert_user(splitwise_id: int, name: str, email: str) -> dict:
     finally:
         conn.close()
 
-    return get_user_by_splitwise_id(splitwise_id)
+    user = get_user_by_splitwise_id(splitwise_id)
+    logger.info("Upserted user: db_id=%s splitwise_id=%s name=%s", user["id"] if user else "-", splitwise_id, name)
+    return user
 
 
 def get_user_by_splitwise_id(splitwise_id: int) -> Optional[dict]:

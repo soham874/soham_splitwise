@@ -1,9 +1,12 @@
+import logging
 import pathlib
 
 import mysql.connector
 from mysql.connector import pooling
 
 from backend.config import settings
+
+logger = logging.getLogger(__name__)
 
 _pool: pooling.MySQLConnectionPool | None = None
 
@@ -13,6 +16,8 @@ MIGRATIONS_DIR = pathlib.Path(__file__).parent / "migrations"
 def _get_pool() -> pooling.MySQLConnectionPool:
     global _pool
     if _pool is None:
+        logger.info("Creating MySQL connection pool: host=%s port=%s db=%s pool_size=5",
+                     settings.MYSQL_HOST, settings.MYSQL_PORT, settings.MYSQL_DATABASE)
         _pool = pooling.MySQLConnectionPool(
             pool_name="splitwise_pool",
             pool_size=5,
@@ -78,7 +83,7 @@ def _run_migration(conn: mysql.connector.MySQLConnection, path: pathlib.Path) ->
     )
     conn.commit()
     cursor.close()
-    print(f"[db] Applied migration: {version}")
+    logger.info("Applied migration: %s", version)
 
 
 def init_db() -> None:
@@ -106,10 +111,10 @@ def init_db() -> None:
     pending = [f for f in migration_files if f.stem not in applied]
 
     if not pending:
-        print(f"[db] All {len(applied)} migration(s) already applied – database up to date.")
+        logger.info("All %d migration(s) already applied – database up to date.", len(applied))
     else:
         for mf in pending:
             _run_migration(conn, mf)
-        print(f"[db] {len(pending)} migration(s) applied. Database ready.")
+        logger.info("%d migration(s) applied. Database ready.", len(pending))
 
     conn.close()

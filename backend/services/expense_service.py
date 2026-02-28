@@ -1,9 +1,12 @@
+import logging
 from typing import Optional
 from decimal import Decimal
 
 import requests
 
 from backend.db import get_connection
+
+logger = logging.getLogger(__name__)
 
 EXCHANGE_RATE_API = "https://v6.exchangerate-api.com/v6/bd518438bcd832b6b743de47/pair"
 
@@ -28,7 +31,9 @@ def get_inr_rate(currency_code: str) -> float:
         resp = requests.get(f"{EXCHANGE_RATE_API}/{currency_code}/INR", timeout=10)
         data = resp.json()
         rate = float(data.get("conversion_rate", 1.0))
+        logger.debug("Exchange rate %s->INR = %s", currency_code, rate)
     except Exception:
+        logger.warning("Failed to fetch exchange rate for %s->INR, defaulting to 1.0", currency_code)
         rate = 1.0
 
     _rate_cache[currency_code] = rate
@@ -52,7 +57,9 @@ def get_conversion_rate(from_code: str, to_code: str) -> float:
         resp = requests.get(f"{EXCHANGE_RATE_API}/{from_code}/{to_code}", timeout=10)
         data = resp.json()
         rate = float(data.get("conversion_rate", 1.0))
+        logger.debug("Exchange rate %s->%s = %s", from_code, to_code, rate)
     except Exception:
+        logger.warning("Failed to fetch exchange rate for %s->%s, defaulting to 1.0", from_code, to_code)
         rate = 1.0
 
     _rate_cache[cache_key] = rate
@@ -75,6 +82,7 @@ def save_expense_rows(
     The amount is converted to INR before storing.
     """
     rate = get_inr_rate(currency_code)
+    logger.info("save_expense_rows: expense_id=%s trip_id=%s users=%d currency=%s", expense_id, trip_id, len(users), currency_code)
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -112,10 +120,12 @@ def save_expense_rows(
 def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> None:
     """Bulk-insert Splitwise expenses into the local expenses table.
 
+
     For each expense, one row is created per user who has owed_share > 0.
     Amounts are converted to INR.  Location and category are left blank
     because Splitwise doesn't carry those fields.
     """
+    logger.info("sync_expenses_from_splitwise: trip_id=%s count=%d", trip_id, len(sw_expenses))
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -166,10 +176,12 @@ def sync_expenses_from_splitwise(trip_id: str, sw_expenses: list[dict]) -> None:
 
 def delete_expense_rows(expense_id: str) -> None:
     """Delete all rows for a given expense_id (Splitwise or local)."""
+    logger.info("delete_expense_rows: expense_id=%s", expense_id)
     conn = get_connection()
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM expenses WHERE expense_id = %s", (expense_id,))
+        logger.debug("Deleted %d expense rows for expense_id=%s", cursor.rowcount, expense_id)
         conn.commit()
         cursor.close()
     finally:

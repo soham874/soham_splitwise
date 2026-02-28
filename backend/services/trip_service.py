@@ -1,6 +1,9 @@
+import logging
 from typing import Optional
 
 from backend.db import get_connection
+
+logger = logging.getLogger(__name__)
 
 
 def _row_to_dict(row: dict) -> dict:
@@ -24,6 +27,7 @@ def create_trip(user_id: int, group_id: str, name: str,
                 locations: list[str] | None = None,
                 created_by: int | None = None) -> dict:
     """Insert a new trip for the given user and return it."""
+    logger.debug("create_trip: user_id=%s group_id=%s name=%s", user_id, group_id, name)
     currencies_csv = ",".join(currencies) if currencies else ""
     locations_csv = ",".join(locations) if locations else ""
     conn = get_connection()
@@ -44,7 +48,9 @@ def create_trip(user_id: int, group_id: str, name: str,
     finally:
         conn.close()
 
-    return get_trip_by_id(trip_id)
+    result = get_trip_by_id(trip_id)
+    logger.info("Trip row created: id=%s user_id=%s group_id=%s", trip_id, user_id, group_id)
+    return result
 
 
 def update_trip(trip_id: int, group_id: str, name: str,
@@ -102,6 +108,7 @@ def get_trips(user_id: int) -> list[dict]:
 
 def delete_trip(trip_id: int) -> None:
     """Delete a trip (and all sibling trip rows for the same group) and all related expense rows."""
+    logger.info("delete_trip: trip_id=%s", trip_id)
     conn = get_connection()
     try:
         cursor = conn.cursor(dictionary=True)
@@ -117,6 +124,9 @@ def delete_trip(trip_id: int) -> None:
             cursor.execute(
                 "DELETE FROM trips WHERE group_id = %s", (group_id,)
             )
+            logger.info("Deleted all trip rows and expenses for group_id=%s", group_id)
+        else:
+            logger.warning("delete_trip: trip_id=%s not found", trip_id)
         conn.commit()
         cursor.close()
     finally:

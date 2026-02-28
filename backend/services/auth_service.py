@@ -1,3 +1,5 @@
+import logging
+
 from requests_oauthlib import OAuth1Session
 
 from backend.config import settings
@@ -8,11 +10,16 @@ from backend.constants import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def create_request_token() -> dict:
     """Initiate OAuth1 flow and return request token data + authorization URL."""
+    logger.info("Requesting OAuth request token")
     oauth = OAuth1Session(settings.CONSUMER_KEY, client_secret=settings.CONSUMER_SECRET)
     fetch_response = oauth.fetch_request_token(REQUEST_TOKEN_URL)
     authorization_url = oauth.authorization_url(AUTHORIZATION_URL)
+    logger.info("Request token obtained")
     return {
         "oauth_token": fetch_response.get("oauth_token"),
         "oauth_token_secret": fetch_response.get("oauth_token_secret"),
@@ -34,6 +41,7 @@ def exchange_access_token(
         verifier=verifier,
     )
     tokens = oauth.fetch_access_token(ACCESS_TOKEN_URL)
+    logger.info("Access token exchanged successfully")
     return {
         "oauth_token": tokens.get("oauth_token"),
         "oauth_token_secret": tokens.get("oauth_token_secret"),

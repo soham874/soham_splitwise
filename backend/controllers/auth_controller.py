@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 
@@ -11,6 +13,8 @@ from backend.constants import (
 from backend.config import settings
 from backend.dependencies import get_oauth_session
 from backend.services import auth_service, splitwise_service, user_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -27,19 +31,23 @@ def check_login(request: Request):
         user = user_service.get_user_by_id(request.session[SESSION_USER_ID])
         if user:
             result["user"] = {"id": user["id"], "name": user["name"], "email": user["email"]}
+    logger.info("check_login: logged_in=%s user_id=%s", is_logged_in, request.session.get(SESSION_USER_ID, "-"))
     return result
 
 
 @router.get("/login")
 def login(request: Request):
+    logger.info("OAuth login flow initiated")
     token_data = auth_service.create_request_token()
     request.session[SESSION_RESOURCE_OWNER_KEY] = token_data["oauth_token"]
     request.session[SESSION_RESOURCE_OWNER_SECRET] = token_data["oauth_token_secret"]
+    logger.info("Redirecting to Splitwise authorization")
     return RedirectResponse(url=token_data["authorization_url"])
 
 
 @router.get("/callback")
 def callback(request: Request, oauth_verifier: str):
+    logger.info("OAuth callback received")
     tokens = auth_service.exchange_access_token(
         resource_owner_key=request.session.get(SESSION_RESOURCE_OWNER_KEY, ""),
         resource_owner_secret=request.session.get(SESSION_RESOURCE_OWNER_SECRET, ""),
@@ -58,11 +66,14 @@ def callback(request: Request, oauth_verifier: str):
         email=sw_user.get("email", ""),
     )
     request.session[SESSION_USER_ID] = db_user["id"]
+    logger.info("User authenticated: db_id=%s splitwise_id=%s name=%s", db_user["id"], sw_user.get("id"), db_user["name"])
 
     return RedirectResponse(url=settings.FRONTEND_URL)
 
 
 @router.get("/logout")
 def logout(request: Request):
+    user_id = request.session.get(SESSION_USER_ID, "-")
     request.session.clear()
+    logger.info("User logged out: user_id=%s", user_id)
     return RedirectResponse(url=settings.FRONTEND_URL)
