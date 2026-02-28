@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS trips (
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_id (user_id),
+    INDEX idx_trips_group_id (group_id),
     CONSTRAINT fk_trips_user FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -48,5 +49,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_trip_id (trip_id),
-    INDEX idx_expense_id (expense_id)
+    INDEX idx_expense_id (expense_id),
+    INDEX idx_expenses_user_id (user_id),
+    INDEX idx_expenses_trip_user (trip_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
