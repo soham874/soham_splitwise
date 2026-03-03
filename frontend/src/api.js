@@ -122,6 +122,11 @@ export async function updateStayDates(id, startDate, endDate, location) {
   return res.json();
 }
 
+export async function getLocationCoordsApi(names) {
+  const res = await apiFetch(`/location_coords?names=${encodeURIComponent(names.join(","))}`);
+  return res.json();
+}
+
 export async function updateExpenseDetails(id, location, category) {
   const res = await apiFetch("/update_expense_details", {
     method: "POST",

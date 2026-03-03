@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { detectPosition, findClosestLocation } from "../geo";
 
 const EXPENSE_CATEGORIES = [
   "Important Documents",
@@ -22,17 +23,19 @@ export default function ExpenseForm({
   currentExpenses,
   currentUser,
   tripLocations = [],
+  locationCoords = [],
   onSubmit,
 }) {
   const [editId, setEditId] = useState("");
   const [description, setDescription] = useState("");
-  const [totalCost, setTotalCost] = useState("0.00");
+  const [totalCost, setTotalCost] = useState("");
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState(currencies[0]?.currency_code || "INR");
   const [splitEqually, setSplitEqually] = useState(true);
   const [personalExpense, setPersonalExpense] = useState(false);
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
+  const [detectedCity, setDetectedCity] = useState("");
   const skipRecalcRef = useRef(false);
 
   // Resolve the default payer to the logged-in user if they are a group member
@@ -64,6 +67,27 @@ export default function ExpenseForm({
     setPayerId(resolveDefaultPayer());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGroup]);
+
+  // Auto-detect closest location from GPS when locationCoords are available
+  useEffect(() => {
+    if (locationCoords.length === 0) {
+      console.log("[GeoDebug] No locationCoords yet, skipping auto-detect");
+      return;
+    }
+    console.log("[GeoDebug] locationCoords received, requesting GPS...", locationCoords);
+    detectPosition()
+      .then(({ latitude, longitude }) => {
+        console.log("[GeoDebug] GPS position:", latitude, longitude);
+        const closest = findClosestLocation(latitude, longitude, locationCoords);
+        console.log("[GeoDebug] Closest location:", closest);
+        if (closest) {
+          setDetectedCity(closest.name);
+          if (!location) setLocation(closest.name);
+        }
+      })
+      .catch((err) => console.warn("[GeoDebug] Geolocation failed:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationCoords]);
 
   const recalculate = useCallback(
     (cost, splits, equally, payer) => {
@@ -214,12 +238,12 @@ export default function ExpenseForm({
   const resetForm = () => {
     setEditId("");
     setDescription("");
-    setTotalCost("0.00");
+    setTotalCost("");
     setNotes("");
     setSplitEqually(true);
     setPersonalExpense(false);
     setCurrency(currencies[0]?.currency_code || "INR");
-    setLocation("");
+    setLocation(detectedCity || "");
     setCategory("");
     setPayerId(resolveDefaultPayer());
     setMemberSplits(
@@ -386,6 +410,7 @@ export default function ExpenseForm({
             value={totalCost}
             onChange={(e) => setTotalCost(e.target.value)}
             className="w-full border border-gray-200 rounded-lg p-2.5 font-mono text-base focus:ring-2 focus:ring-emerald-500 outline-none"
+            placeholder="0.00"
           />
         </div>
         <div>
@@ -411,13 +436,28 @@ export default function ExpenseForm({
         <div>
           <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">
             Location
+            {detectedCity && (
+              <button
+                type="button"
+                onClick={() => setLocation(detectedCity)}
+                className="ml-2 text-emerald-600 text-[10px] hover:underline normal-case font-semibold"
+              >
+                📍 Use {detectedCity}
+              </button>
+            )}
           </label>
           <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             className="w-full border border-gray-200 rounded-lg p-2.5 bg-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
           >
-            <option value="">{tripLocations.length === 0 ? "No locations set" : "Select location..."}</option>
+            <option value="">
+              {detectedCity
+                ? `📍 Detected: ${detectedCity}`
+                : tripLocations.length === 0
+                ? "No locations set"
+                : "Select location..."}
+            </option>
             {tripLocations.map((loc) => (
               <option key={loc} value={loc}>
                 {loc}

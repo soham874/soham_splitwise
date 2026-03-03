@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { fetchExpenses, createExpense, deleteExpenseApi, syncExpenses, fetchPersonalExpenses } from "../api";
+import { fetchExpenses, createExpense, deleteExpenseApi, syncExpenses, fetchPersonalExpenses, getLocationCoordsApi } from "../api";
 import ExpenseForm from "./ExpenseForm";
 import BalancesPanel from "./BalancesPanel";
 import ExpenseHistory from "./ExpenseHistory";
@@ -13,6 +13,22 @@ export default function DashboardPage({
   onRefresh,
 }) {
   const [currentExpenses, setCurrentExpenses] = useState([]);
+  const [locationCoords, setLocationCoords] = useState([]);
+
+  // Fetch and cache location coordinates for trip locations (lazy backfill)
+  const locationsKey = (tripDetails?.locations || []).join(",");
+  useEffect(() => {
+    const locs = tripDetails?.locations || [];
+    if (locs.length === 0) return;
+    console.log("[GeoDebug] Fetching coords for locations:", locs);
+    getLocationCoordsApi(locs)
+      .then((data) => {
+        console.log("[GeoDebug] Got location coords:", data.coords);
+        setLocationCoords(data.coords || []);
+      })
+      .catch((err) => console.warn("[GeoDebug] Failed to fetch location coords:", err));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationsKey]);
 
   const loadHistory = useCallback(async () => {
     await syncExpenses(activeGroup.id).catch(() => {});
@@ -94,6 +110,7 @@ export default function DashboardPage({
           currentExpenses={currentExpenses}
           currentUser={currentUser}
           tripLocations={tripDetails?.locations || []}
+          locationCoords={locationCoords}
           onSubmit={handleSubmit}
         />
 
