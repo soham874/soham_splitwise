@@ -36,7 +36,16 @@ export default function ExpenseForm({
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [detectedCity, setDetectedCity] = useState("");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const skipRecalcRef = useRef(false);
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
+  }, []);
 
   // Resolve the default payer to the logged-in user if they are a group member
   const resolveDefaultPayer = () => {
@@ -312,6 +321,12 @@ export default function ExpenseForm({
       ref={formRef}
       className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200"
     >
+      {!isOnline && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-3 py-2 rounded-lg mb-4 flex items-center gap-2">
+          <span>You're offline — expenses will be saved locally and synced when you reconnect.</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
         <div>
           <p className="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-wider">

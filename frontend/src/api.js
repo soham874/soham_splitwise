@@ -1,6 +1,45 @@
 const generateRequestId = () =>
   `fe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+// ── Offline queue helpers ──────────────────────────────────────────────
+const OFFLINE_QUEUE_KEY = "offline_expense_queue";
+const CACHED_RATES_KEY = "cached_conversion_rates";
+
+function getOfflineQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function saveOfflineQueue(queue) {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+export function getOfflineQueueCount() {
+  return getOfflineQueue().length;
+}
+
+export async function flushOfflineQueue() {
+  const queue = getOfflineQueue();
+  if (queue.length === 0) return [];
+  const results = [];
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      const { _offlineId, _queuedAt, ...payload } = item;
+      const res = await apiFetch("/create_expense", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      results.push({ offlineId: _offlineId, result: await res.json() });
+    } catch {
+      remaining.push(item);
+    }
+  }
+  saveOfflineQueue(remaining);
+  return results;
+}
+
 const apiFetch = (url, options = {}) => {
   const requestId = generateRequestId();
   const headers = { ...(options.headers || {}), "X-Request-ID": requestId };
@@ -36,6 +75,13 @@ export async function fetchExpenses(groupId) {
 }
 
 export async function createExpense(payload) {
+  if (!navigator.onLine) {
+    const tempId = `offline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const queue = getOfflineQueue();
+    queue.push({ ...payload, _offlineId: tempId, _queuedAt: new Date().toISOString() });
+    saveOfflineQueue(queue);
+    return { expenses: [{ id: tempId, description: payload.description }], _offline: true };
+  }
   const res = await apiFetch("/create_expense", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -100,17 +146,49 @@ export async function syncExpenses(groupId) {
 }
 
 export async function convertCurrency(from, to, amount) {
+  if (!navigator.onLine) {
+    const cached = getCachedRates();
+    const key = `${from}_${to}`;
+    if (cached[key]) return { rate: cached[key], result: Math.round(amount * cached[key] * 100) / 100, _offline: true };
+  }
   const res = await apiFetch(`/convert/${from}/${to}/${amount}`);
-  return res.json();
+  const data = await res.json();
+  if (data.rate) cacheRate(from, to, data.rate);
+  return data;
 }
 
 export async function convertBatch(base, targets) {
+  if (!navigator.onLine) {
+    const cached = getCachedRates();
+    const rates = {};
+    for (const t of targets) {
+      const key = `${base}_${t}`;
+      if (cached[key]) rates[t] = cached[key];
+    }
+    if (Object.keys(rates).length === targets.length) return { base, rates, _offline: true };
+  }
   const res = await apiFetch("/convert_batch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ base, targets }),
   });
-  return res.json();
+  const data = await res.json();
+  if (data.rates) {
+    for (const [t, r] of Object.entries(data.rates)) cacheRate(base, t, r);
+  }
+  return data;
+}
+
+// ── Conversion rate cache ──────────────────────────────────────────────
+function getCachedRates() {
+  try { return JSON.parse(localStorage.getItem(CACHED_RATES_KEY) || "{}"); }
+  catch { return {}; }
+}
+
+function cacheRate(from, to, rate) {
+  const cached = getCachedRates();
+  cached[`${from}_${to}`] = rate;
+  localStorage.setItem(CACHED_RATES_KEY, JSON.stringify(cached));
 }
 
 export async function updateStayDates(id, startDate, endDate, location) {

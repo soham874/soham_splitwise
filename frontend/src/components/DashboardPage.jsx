@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { fetchExpenses, createExpense, deleteExpenseApi, syncExpenses, fetchPersonalExpenses, getLocationCoordsApi } from "../api";
+import { fetchExpenses, createExpense, deleteExpenseApi, syncExpenses, fetchPersonalExpenses, getLocationCoordsApi, flushOfflineQueue, getOfflineQueueCount } from "../api";
 import ExpenseForm from "./ExpenseForm";
 import BalancesPanel from "./BalancesPanel";
 import ExpenseHistory from "./ExpenseHistory";
@@ -14,6 +14,29 @@ export default function DashboardPage({
 }) {
   const [currentExpenses, setCurrentExpenses] = useState([]);
   const [locationCoords, setLocationCoords] = useState([]);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(getOfflineQueueCount());
+
+  // Track online/offline status and flush queued expenses on reconnect
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true);
+      const synced = await flushOfflineQueue();
+      setPendingCount(getOfflineQueueCount());
+      if (synced.length > 0) {
+        console.log(`[Offline] Synced ${synced.length} queued expense(s)`);
+        await onRefresh(activeGroup.id);
+        await loadHistory();
+      }
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    // Also try flushing on mount in case we're already online with a stale queue
+    if (navigator.onLine && getOfflineQueueCount() > 0) handleOnline();
+    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeGroup.id]);
 
   // Fetch and cache location coordinates for trip locations (lazy backfill)
   const locationsKey = (tripDetails?.locations || []).join(",");
@@ -64,7 +87,12 @@ export default function DashboardPage({
   })();
 
   const handleSubmit = async (payload) => {
-    await createExpense(payload);
+    const result = await createExpense(payload);
+    setPendingCount(getOfflineQueueCount());
+    if (result._offline) {
+      // Queued locally — no server refresh needed
+      return;
+    }
     await onRefresh(activeGroup.id);
     await loadHistory();
   };
@@ -98,9 +126,16 @@ export default function DashboardPage({
           </svg>
           Back to Trip
         </button>
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">
-          {activeGroup.name}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800">
+            {activeGroup.name}
+          </h2>
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center bg-amber-100 text-amber-800 text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200">
+              {pendingCount} pending sync
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-8">
