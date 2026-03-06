@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { checkLogin, fetchGroups, fetchCurrencies, createTripApi, updateTripApi, deleteTripApi, getTripsApi } from "./api";
+import { checkLogin, fetchGroups, fetchCurrencies, createTripApi, updateTripApi, deleteTripApi, getTripsApi, flushOfflineQueue, getOfflineQueueCount } from "./api";
 import Navbar from "./components/Navbar";
 import LoadingOverlay from "./components/LoadingOverlay";
 import TripSetupPage from "./components/TripSetupPage";
@@ -10,6 +10,17 @@ import AnalyticsPage from "./components/AnalyticsPage";
 import ConfirmDialog from "./components/ConfirmDialog";
 import LandingPage from "./components/LandingPage";
 import CurrencyConverterPage from "./components/CurrencyConverterPage";
+
+// ── Offline cache helpers ────────────────────────────────────────────
+const CACHE_KEYS = { user: "cached_user", trips: "cached_trips", groups: "cached_groups", currencies: "cached_currencies" };
+
+function cacheSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function cacheGet(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+}
 
 const PAGES = {
   LOADING: "loading",
@@ -36,8 +47,10 @@ export default function App() {
   const loadGroups = useCallback(async () => {
     try {
       const data = await fetchGroups();
-      setAllGroups(data.groups || []);
-      return data.groups || [];
+      const groups = data.groups || [];
+      setAllGroups(groups);
+      cacheSet(CACHE_KEYS.groups, groups);
+      return groups;
     } catch {
       return [];
     }
@@ -57,8 +70,10 @@ export default function App() {
         return a.currency_code.localeCompare(b.currency_code);
       });
       setAvailableCurrencies(currencies);
+      cacheSet(CACHE_KEYS.currencies, currencies);
     } catch {
-      setAvailableCurrencies([
+      const cached = cacheGet(CACHE_KEYS.currencies);
+      setAvailableCurrencies(cached || [
         { currency_code: "INR", unit: "₹" },
         { currency_code: "USD", unit: "$" },
       ]);
@@ -70,10 +85,39 @@ export default function App() {
       const data = await getTripsApi();
       const trips = data.trips || [];
       setAllTrips(trips);
+      cacheSet(CACHE_KEYS.trips, trips);
       return trips;
     } catch {
       return [];
     }
+  }, []);
+
+  // Try to resume from cached data when offline
+  const tryOfflineResume = useCallback(() => {
+    const cachedUser = cacheGet(CACHE_KEYS.user);
+    const cachedTrips = cacheGet(CACHE_KEYS.trips);
+    const cachedGroups = cacheGet(CACHE_KEYS.groups);
+    const cachedCurrencies = cacheGet(CACHE_KEYS.currencies);
+    const lastTripId = localStorage.getItem("lastTripId");
+
+    if (!cachedUser || !lastTripId) return false;
+
+    const trip = (cachedTrips || []).find((t) => String(t.id) === lastTripId);
+    if (!trip) return false;
+
+    const gid = parseInt(trip.groupId);
+    const group = (cachedGroups || []).find((g) => g.id === gid);
+    if (!group) return false;
+
+    // Restore all state from cache
+    setCurrentUser(cachedUser);
+    setAllTrips(cachedTrips || []);
+    setAllGroups(cachedGroups || []);
+    setAvailableCurrencies(cachedCurrencies || [{ currency_code: "INR", unit: "\u20b9" }, { currency_code: "USD", unit: "$" }]);
+    setSelectedTrip(trip);
+    setActiveGroup(group);
+    setPage(PAGES.DASHBOARD);
+    return true;
   }, []);
 
   useEffect(() => {
@@ -81,7 +125,10 @@ export default function App() {
       try {
         const data = await checkLogin();
         if (data.logged_in) {
-          if (data.user) setCurrentUser(data.user);
+          if (data.user) {
+            setCurrentUser(data.user);
+            cacheSet(CACHE_KEYS.user, data.user);
+          }
           const [, groups, trips] = await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
 
           // Auto-resume last opened trip
@@ -109,7 +156,10 @@ export default function App() {
           setPage(PAGES.LANDING);
         }
       } catch {
-        setPage(PAGES.LANDING);
+        // Offline or network error — try resuming from cache
+        if (!tryOfflineResume()) {
+          setPage(PAGES.LANDING);
+        }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,7 +211,13 @@ export default function App() {
   };
 
   const refreshAndShowDashboard = async (groupId) => {
-    const groups = await loadGroups();
+    let groups;
+    try {
+      groups = await loadGroups();
+    } catch {
+      // Offline — use current state
+      groups = allGroups;
+    }
     const group = groups.find((g) => g.id === groupId);
     if (group) {
       setActiveGroup(group);
