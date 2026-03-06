@@ -11,7 +11,6 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 BACKEND_PID=""
-FRONTEND_PID=""
 
 log() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
@@ -27,39 +26,30 @@ start_server() {
     log "${YELLOW}[2/4] Installing backend dependencies...${NC}"
     pip install -q -r "$PROJECT_DIR/backend/requirements.txt"
 
-    log "${YELLOW}[3/4] Starting FastAPI backend (uvicorn) on port 8080...${NC}"
-    cd "$PROJECT_DIR"
-    uvicorn backend.main:app --host 0.0.0.0 --port 8080 &
-    BACKEND_PID=$!
-
-    log "${YELLOW}[4/4] Installing frontend dependencies & building...${NC}"
+    log "${YELLOW}[3/4] Installing frontend dependencies & building PWA...${NC}"
     cd "$PROJECT_DIR/frontend"
     npm install --silent
     npm run build
 
-    log "${GREEN}Serving frontend on port 5173...${NC}"
-    npx serve -s dist -l 5173 &
-    FRONTEND_PID=$!
+    log "${YELLOW}[4/4] Starting FastAPI server on port 8080 (API + PWA)...${NC}"
+    cd "$PROJECT_DIR"
+    uvicorn backend.main:app --host 0.0.0.0 --port 8080 &
+    BACKEND_PID=$!
 
     log "${GREEN}============================================${NC}"
-    log "${GREEN}  Backend  → http://localhost:8080${NC}"
-    log "${GREEN}  Frontend → http://localhost:5173${NC}"
+    log "${GREEN}  App → http://localhost:8080${NC}"
+    log "${GREEN}  (API + PWA served from single server)${NC}"
     log "${GREEN}============================================${NC}"
 }
 
 stop_server() {
-    log "${YELLOW}Stopping running servers...${NC}"
+    log "${YELLOW}Stopping running server...${NC}"
     if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
         kill "$BACKEND_PID" 2>/dev/null || true
         wait "$BACKEND_PID" 2>/dev/null || true
     fi
-    if [ -n "$FRONTEND_PID" ] && kill -0 "$FRONTEND_PID" 2>/dev/null; then
-        kill "$FRONTEND_PID" 2>/dev/null || true
-        wait "$FRONTEND_PID" 2>/dev/null || true
-    fi
     deactivate 2>/dev/null || true
     BACKEND_PID=""
-    FRONTEND_PID=""
 }
 
 cleanup() {

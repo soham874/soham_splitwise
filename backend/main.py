@@ -1,12 +1,16 @@
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import FileResponse
 
 from backend.config import settings
 from backend.db import init_db
@@ -98,3 +102,24 @@ def health():
     except Exception as e:
         db_status = f"error: {e}"
     return {"status": "ok", "db": db_status}
+
+
+# --- Serve frontend (built PWA) from dist/ ---
+FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.is_dir():
+    # Serve static assets (js, css, icons, sw.js, manifest, etc.)
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="frontend-assets")
+
+    # Serve top-level static files (sw.js, manifest.webmanifest, icons, registerSW.js, workbox-*.js)
+    @app.get("/{filename:path}")
+    async def serve_frontend(request: Request, filename: str):
+        # Skip API routes (already handled above)
+        if filename.startswith("api/"):
+            return Response(status_code=404)
+        # Try to serve exact file from dist/
+        file_path = FRONTEND_DIST / filename
+        if filename and file_path.is_file():
+            return FileResponse(file_path)
+        # SPA fallback: serve index.html for all other routes
+        return FileResponse(FRONTEND_DIST / "index.html")
