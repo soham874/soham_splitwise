@@ -112,22 +112,29 @@ def health():
     return {"status": "ok", "db": db_status}
 
 
-# --- Serve frontend (built PWA) from dist/ ---
+# --- Serve frontend from dist/ ---
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 if FRONTEND_DIST.is_dir():
-    # Serve static assets (js, css, icons, sw.js, manifest, etc.)
+    # Serve static assets (js, css, icons, etc.)
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="frontend-assets")
 
-    # Serve top-level static files (sw.js, manifest.webmanifest, icons, registerSW.js, workbox-*.js)
-    @app.get("/{filename:path}")
-    async def serve_frontend(request: Request, filename: str):
-        # Skip API routes (already handled above)
-        if filename.startswith("api/"):
-            return Response(status_code=404)
-        # Try to serve exact file from dist/
-        file_path = FRONTEND_DIST / filename
-        if filename and file_path.is_file():
-            return FileResponse(file_path)
-        # SPA fallback: serve index.html for all other routes
-        return FileResponse(FRONTEND_DIST / "index.html")
+    # SPA fallback: catch any non-API GET that didn't match a route.
+    # Using middleware so it never shadows API router endpoints.
+    @app.middleware("http")
+    async def spa_fallback(request: Request, call_next):
+        response = await call_next(request)
+        # Only intercept GET requests that got a 404 and aren't API routes
+        if (
+            request.method == "GET"
+            and response.status_code == 404
+            and not request.url.path.startswith("/api/")
+        ):
+            # Try exact file in dist/
+            rel = request.url.path.lstrip("/")
+            candidate = FRONTEND_DIST / rel
+            if rel and candidate.is_file():
+                return FileResponse(candidate)
+            # SPA fallback → index.html
+            return FileResponse(FRONTEND_DIST / "index.html")
+        return response
