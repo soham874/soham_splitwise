@@ -22,6 +22,11 @@ function cacheGet(key) {
   try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
 }
 
+function clearCache() {
+  Object.values(CACHE_KEYS).forEach((k) => { try { localStorage.removeItem(k); } catch {} });
+  try { localStorage.removeItem("lastTripId"); } catch {}
+}
+
 const PAGES = {
   LOADING: "loading",
   LANDING: "landing",
@@ -124,11 +129,9 @@ export default function App() {
     (async () => {
       try {
         const data = await checkLogin();
-        if (data.logged_in) {
-          if (data.user) {
-            setCurrentUser(data.user);
-            cacheSet(CACHE_KEYS.user, data.user);
-          }
+        if (data.logged_in && data.user) {
+          setCurrentUser(data.user);
+          cacheSet(CACHE_KEYS.user, data.user);
           const [, groups, trips] = await Promise.all([loadCurrencies(), loadGroups(), loadTrips()]);
 
           // Auto-resume last opened trip
@@ -153,6 +156,7 @@ export default function App() {
             setPage(PAGES.MY_TRIPS);
           }
         } else {
+          clearCache();
           setPage(PAGES.LANDING);
         }
       } catch {
@@ -230,7 +234,10 @@ export default function App() {
 
   return (
     <div>
-      <Navbar onHome={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }} />
+      <Navbar
+        onHome={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }}
+        onLogout={() => { clearCache(); window.location.href = "/api/logout"; }}
+      />
 
       {page === PAGES.MY_TRIPS && (
         <MyTripsPage
