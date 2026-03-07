@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from backend.config import settings
 from backend.db import init_db
@@ -70,7 +71,14 @@ app = FastAPI(title="Splitwise Manager API", lifespan=lifespan)
 # Middleware order matters: outermost first, innermost last.
 # RequestTracing wraps everything so it sees the final status code.
 app.add_middleware(RequestTracingMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    https_only=settings.HTTPS_ENABLED,
+    same_site="lax",
+)
+if settings.HTTPS_ENABLED:
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],

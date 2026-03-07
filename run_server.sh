@@ -33,7 +33,7 @@ start_server() {
 
     log "${YELLOW}[4/4] Starting FastAPI server on port 8080 (API + PWA)...${NC}"
     cd "$PROJECT_DIR"
-    uvicorn backend.main:app --host 0.0.0.0 --port 8080 &
+    uvicorn backend.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips='*' &
     BACKEND_PID=$!
 
     log "${GREEN}============================================${NC}"

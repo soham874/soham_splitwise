@@ -11,6 +11,7 @@ class Settings:
     BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8080"))
     FRONTEND_PORT: int = int(os.getenv("FRONTEND_PORT", "5173"))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    HTTPS_ENABLED: bool = os.getenv("HTTPS_ENABLED", "false").lower() in ("true", "1", "yes")
 
     # MySQL
     MYSQL_HOST: str = os.getenv("MYSQL_HOST", "127.0.0.1")
