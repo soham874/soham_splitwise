@@ -6,6 +6,7 @@ export default function TripDetailPage({
   onManageExpenses,
   onViewAnalytics,
   onCurrencyConverter,
+  onEmergencyServices,
   onEditTrip,
   onDeleteTrip,
   onBack,
@@ -65,7 +66,7 @@ export default function TripDetailPage({
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-800 rounded-full opacity-40"></div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <button
           onClick={onManageExpenses}
           className="bg-white border border-gray-200 rounded-2xl p-6 text-left hover:border-emerald-400 hover:shadow-md transition group"
@@ -103,6 +104,18 @@ export default function TripDetailPage({
           </div>
           <h3 className="text-lg font-bold text-gray-800 mb-1">Currency Converter</h3>
           <p className="text-sm text-gray-500">Convert between trip currencies with live rates.</p>
+        </button>
+        <button
+          onClick={onEmergencyServices}
+          className="bg-white border border-gray-200 rounded-2xl p-6 text-left hover:border-rose-400 hover:shadow-md transition group"
+        >
+          <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-rose-200 transition">
+            <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 mb-1">Emergency Services</h3>
+          <p className="text-sm text-gray-500">Find hospitals, police stations, and pharmacies nearby.</p>
         </button>
       </div>
 

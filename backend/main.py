@@ -23,6 +23,7 @@ from backend.controllers import (
     currencies_controller,
     trip_controller,
     location_controller,
+    emergency_controller,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ app.include_router(expenses_controller.router, prefix="/api")
 app.include_router(currencies_controller.router, prefix="/api")
 app.include_router(trip_controller.router, prefix="/api")
 app.include_router(location_controller.router, prefix="/api")
+app.include_router(emergency_controller.router, prefix="/api")
 
 
 @app.get("/api/health")

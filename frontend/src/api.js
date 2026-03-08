@@ -213,3 +213,10 @@ export async function updateExpenseDetails(id, location, category) {
   });
   return res.json();
 }
+
+export async function fetchEmergencyServices(location, category = "all") {
+  const res = await apiFetch(
+    `/emergency_services?location=${encodeURIComponent(location)}&category=${encodeURIComponent(category)}`
+  );
+  return res.json();
+}

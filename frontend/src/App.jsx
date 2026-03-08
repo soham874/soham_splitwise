@@ -10,6 +10,7 @@ import AnalyticsPage from "./components/AnalyticsPage";
 import ConfirmDialog from "./components/ConfirmDialog";
 import LandingPage from "./components/LandingPage";
 import CurrencyConverterPage from "./components/CurrencyConverterPage";
+import EmergencyServicesPage from "./components/EmergencyServicesPage";
 
 // ── Offline cache helpers ────────────────────────────────────────────
 const CACHE_KEYS = { user: "cached_user", trips: "cached_trips", groups: "cached_groups", currencies: "cached_currencies" };
@@ -36,6 +37,7 @@ const PAGES = {
   DASHBOARD: "dashboard",
   ANALYTICS: "analytics",
   CURRENCY_CONVERTER: "currency_converter",
+  EMERGENCY_SERVICES: "emergency_services",
 };
 
 export default function App() {
@@ -265,6 +267,7 @@ export default function App() {
           onManageExpenses={openDashboard}
           onViewAnalytics={() => setPage(PAGES.ANALYTICS)}
           onCurrencyConverter={() => setPage(PAGES.CURRENCY_CONVERTER)}
+          onEmergencyServices={() => setPage(PAGES.EMERGENCY_SERVICES)}
           onEditTrip={() => { setEditingTrip(selectedTrip); setPage(PAGES.TRIP_SETUP); }}
           onDeleteTrip={() => handleDeleteTrip(selectedTrip.id)}
           onBack={() => { localStorage.removeItem("lastTripId"); setPage(PAGES.MY_TRIPS); }}
@@ -285,6 +288,13 @@ export default function App() {
 
       {page === PAGES.CURRENCY_CONVERTER && selectedTrip && (
         <CurrencyConverterPage
+          tripDetails={selectedTrip}
+          onBack={() => setPage(PAGES.TRIP_DETAIL)}
+        />
+      )}
+
+      {page === PAGES.EMERGENCY_SERVICES && selectedTrip && (
+        <EmergencyServicesPage
           tripDetails={selectedTrip}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
         />
