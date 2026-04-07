@@ -3,7 +3,7 @@ import { convertCurrency, convertBatch } from "../api";
 
 const STANDARD_AMOUNTS = [1, 10, 100, 1000];
 
-export default function CurrencyConverterPage({ tripDetails, onBack }) {
+export default function CurrencyConverterPage({ tripDetails, onBack, onDashboard }) {
   const rawList = tripDetails?.currencies || [];
   // Ensure INR and USD are always in the list
   const currencyList = useMemo(() => {
@@ -114,18 +114,32 @@ export default function CurrencyConverterPage({ tripDetails, onBack }) {
         Back to Trip
       </button>
 
-      <div className="flex items-center gap-2 mb-6">
-        <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-          <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+            <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">Currency Converter</h2>
+            <p className="text-sm text-gray-500">
+              <span className="font-semibold text-gray-700">{tripDetails?.name}</span>
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800">Currency Converter</h2>
-          <p className="text-sm text-gray-500">
-            <span className="font-semibold text-gray-700">{tripDetails?.name}</span>
-          </p>
-        </div>
+        {onDashboard && (
+          <button
+            onClick={onDashboard}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition"
+            title="Add Expenses"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Expenses
+          </button>
+        )}
       </div>
 
       {/* Live Converter */}

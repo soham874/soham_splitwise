@@ -283,6 +283,7 @@ export default function App() {
           currentUser={currentUser}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
           onRefresh={refreshAndShowDashboard}
+          onCurrencyConverter={() => setPage(PAGES.CURRENCY_CONVERTER)}
         />
       )}
 
@@ -290,6 +291,7 @@ export default function App() {
         <CurrencyConverterPage
           tripDetails={selectedTrip}
           onBack={() => setPage(PAGES.TRIP_DETAIL)}
+          onDashboard={openDashboard}
         />
       )}
 
