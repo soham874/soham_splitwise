@@ -2,7 +2,7 @@ import logging
 
 from requests_oauthlib import OAuth1Session
 
-from backend.constants import BASE_API_URL, DEFAULT_EXPENSE_LIMIT
+from backend.constants import BASE_API_URL, DEFAULT_EXPENSE_LIMIT, EXPENSE_PAGE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +22,28 @@ def fetch_groups(oauth: OAuth1Session) -> dict:
 
 
 def fetch_expenses(oauth: OAuth1Session, group_id: str) -> list:
-    logger.debug("Splitwise API: GET /get_expenses group_id=%s", group_id)
-    response = oauth.get(
-        f"{BASE_API_URL}/get_expenses",
-        params={"group_id": group_id, "limit": DEFAULT_EXPENSE_LIMIT},
-    )
-    data = response.json()
-    expenses = data.get("expenses", [])
+    logger.debug("Splitwise API: GET /get_expenses group_id=%s (paginated, max %d)", group_id, DEFAULT_EXPENSE_LIMIT)
+    all_expenses = []
+    offset = 0
+    while offset < DEFAULT_EXPENSE_LIMIT:
+        page_size = min(EXPENSE_PAGE_SIZE, DEFAULT_EXPENSE_LIMIT - offset)
+        response = oauth.get(
+            f"{BASE_API_URL}/get_expenses",
+            params={"group_id": group_id, "limit": page_size, "offset": offset},
+        )
+        data = response.json()
+        page = data.get("expenses", [])
+        all_expenses.extend(page)
+        if len(page) < page_size:
+            break
+        offset += page_size
     # Filter out deleted expenses
     active_expenses = [
         e
-        for e in expenses
+        for e in all_expenses
         if e.get("deleted_at") is None and e.get("deleted_by") is None
     ]
-    logger.debug("Splitwise API: fetched %d expenses (%d active) for group_id=%s", len(expenses), len(active_expenses), group_id)
+    logger.debug("Splitwise API: fetched %d expenses (%d active) for group_id=%s", len(all_expenses), len(active_expenses), group_id)
     return active_expenses
 
 
